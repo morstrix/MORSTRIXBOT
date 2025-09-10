@@ -22,17 +22,13 @@ from weather import weather_command, post_weather_job
 from support import support_command, handle_private_message, handle_reply_button
 from translator import translate_text_command, handle_translation_text, auto_translate_en_to_ua, TRANSLATE_STATE
 
-# Импортируем веб-сервер
-from aiohttp import web
-async def handle(request):
-    return web.Response(text="Bot is running!")
-
 load_dotenv()
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 MESSAGE_THREAD_ID = os.getenv("MESSAGE_THREAD_ID")
 ADMIN_ID = os.getenv("ADMIN_ID")
+RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL")
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.args and context.args[0] == 'support':
@@ -104,16 +100,15 @@ def main():
     # Выбираем режим запуска в зависимости от окружения
     if os.getenv("RENDER") == "true":
         print("Запуск бота в режиме вебхуков для Render.")
-        app = web.Application()
-        app.router.add_get('/', handle)
-        app.router.add_post('/telegram', application.update_handler.handle_web_request)
-
-        # Установка вебхука на Telegram
-        application.updater = None # Важливо!
-        application.set_webhook(url=os.getenv("RENDER_EXTERNAL_URL") + "/telegram")
-
-        port = int(os.environ.get("PORT", 8080))
-        web.run_app(app, port=port)
+        
+        # ПРАВИЛЬНОЕ использование вебхуков
+        application.run_webhook(
+            listen="0.0.0.0",
+            port=int(os.environ.get("PORT", 8080)),
+            url_path="webhook",  # ФИКСИРОВАННЫЙ путь
+            webhook_url=f"{RENDER_EXTERNAL_URL}/webhook",  # Без токена в URL
+            secret_token='WEBHOOK_SECRET'  # Опционально для безопасности
+        )
     else:
         print("Запуск бота в режиме long-polling для локального тестирования.")
         application.run_polling()
