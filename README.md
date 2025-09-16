@@ -9,7 +9,6 @@
 -   **Link Checking**
     -   The bot automatically scans all links using Google Safe Browsing API.
     -   Safe links get a ⚡️ reaction, unsafe links get a 🤬 reaction.
-    -   Links to YouTube Music will show a special "complaint" button.
 -   **Weather**
     -   The `/weather` command provides a forecast for Kyiv.
 -   **Support**
@@ -28,7 +27,6 @@
 -   **Перевірка посилань**
     -   Бот автоматично перевіряє всі посилання через Google Safe Browsing API.
     -   Безпечні посилання отримують реакцію ⚡️, а небезпечні — 🤬.
-    -   Посилання на YouTube Music викликають спеціальну кнопку для скарги.
 -   **Погода**
     -   Команда `/weather` надішле прогноз погоди для Києва.
 -   **Підтримка**
