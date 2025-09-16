@@ -8,18 +8,44 @@ ADMIN_ID = os.getenv('ADMIN_ID')
 if not ADMIN_ID:
     print("Ошибка: ADMIN_ID не найден в .env файле. Функция поддержки будет недоступна.")
 
-# Імпортуємо функцію з ai.py
 from ai import handle_gemini_message_private
 
+async def _delete_message_job(context: ContextTypes.DEFAULT_TYPE):
+    """A job to delete a single message."""
+    chat_id = context.job.data.get('chat_id')
+    message_id = context.job.data.get('message_id')
+    try:
+        await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+    except Exception as e:
+        print(f"Error deleting message {message_id}: {e}")
 
 async def support_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Обрабатывает команду /support и отправляет пользователю кнопку для связи в личном чате.
+    Handles the /support command, sends a button, and schedules message cleanup.
     """
-    keyboard = [[InlineKeyboardButton("❓ꜱᴜᴘᴘᴏʀᴛ", url=f"https://t.me/morstrixbot?start=support")]]
+    keyboard = [[InlineKeyboardButton("❓ꜱᴜᴘᴘᴏʀᴛ", url=f"https://t.me/MORSTRIXBOT?start=support")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("зᴀxᴏдь", reply_markup=reply_markup)
 
+    bot_message = await update.message.reply_text(
+        "зᴀxᴏдь", 
+        reply_markup=reply_markup,
+        message_thread_id=update.message.message_thread_id
+    )
+    
+    # Schedule deletion for user's command after 15 seconds
+    context.job_queue.run_once(
+        _delete_message_job, 
+        15, 
+        data={'chat_id': update.effective_chat.id, 'message_id': update.message.message_id},
+        name=f'del_support_user_{update.message.message_id}'
+    )
+    # Schedule deletion for bot's reply after 15 seconds
+    context.job_queue.run_once(
+        _delete_message_job, 
+        15, 
+        data={'chat_id': update.effective_chat.id, 'message_id': bot_message.message_id},
+        name=f'del_support_bot_{bot_message.message_id}'
+    )
 
 async def handle_private_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -28,17 +54,14 @@ async def handle_private_message(update: Update, context: ContextTypes.DEFAULT_T
     """
     user_id = str(update.effective_user.id)
 
-    # Если сообщение от администратора, это ответ на тикет
     if user_id == ADMIN_ID and context.user_data.get('state') == 'support':
         await reply_to_user(update, context)
         return
     
-    # Если пользователь находится в состоянии поддержки, пересылаем сообщение админу
     if context.user_data.get('state') == 'support':
         await forward_to_admin(update, context)
         context.user_data['state'] = 'ai'
         
-    # Иначе, это запрос к AI
     else:
         await handle_gemini_message_private(update, context)
 
@@ -130,7 +153,6 @@ async def handle_reply_button(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     user_to_reply_id = callback_data[-1]
 
-    # Якщо натиснув адміністратор
     if user_id == ADMIN_ID:
         context.user_data['reply_user_id'] = user_to_reply_id
         context.user_data['state'] = 'support'
@@ -138,7 +160,6 @@ async def handle_reply_button(update: Update, context: ContextTypes.DEFAULT_TYPE
             chat_id=ADMIN_ID, 
             text="ᴋᴀтᴀй ᴏдним ᴄᴧᴏвᴏᴍ",
         )
-    # Якщо натиснув користувач
     else:
         context.user_data['state'] = 'support'
         await context.bot.send_message(

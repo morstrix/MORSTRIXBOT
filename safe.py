@@ -42,20 +42,12 @@ async def check_links(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data = response.json()
 
         if 'matches' in data:
-            # Реакція на небезпечне посилання
+            # Реакція на небезпечне посилання (повідомлення не видаляється)
             await context.bot.set_message_reaction(
                 chat_id=update.effective_chat.id,
                 message_id=update.message.message_id,
                 reaction=[ReactionTypeEmoji("🤬")]
             )
-            await update.message.delete()
-            try:
-                await context.bot.send_message(
-                    chat_id=update.message.from_user.id,
-                    text="видалено ⛔️ шкідливе посилання"
-                )
-            except Exception as e:
-                print(f"Не вдалося попередити користувача {update.message.from_user.id}: {e}")
         else:
             # Реакція на безпечне посилання
             await context.bot.set_message_reaction(

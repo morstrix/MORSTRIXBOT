@@ -16,10 +16,8 @@ async def translate_text_command(update: Update, context: ContextTypes.DEFAULT_T
     """
     Обробляє команду /translate, видаляє її та просить користувача ввести текст.
     """
-    # Зберігаємо ID повідомлення з командою для подальшого видалення
     context.user_data['command_message_id'] = update.message.message_id
     
-    # Видаляємо команду /translate
     try:
         await context.bot.delete_message(
             chat_id=update.effective_chat.id,
@@ -29,9 +27,9 @@ async def translate_text_command(update: Update, context: ContextTypes.DEFAULT_T
         print(f"Помилка видалення команди /translate: {e}")
 
     reply_message = await update.effective_chat.send_message(
-        "введіть текст для перекладу:"
+        "слух",
+        message_thread_id=update.message.message_thread_id
     )
-    # Зберігаємо ID повідомлення-відповіді бота
     context.user_data['reply_message_id'] = reply_message.message_id
     
     return TRANSLATE_STATE
@@ -53,15 +51,14 @@ async def handle_translation_text(update: Update, context: ContextTypes.DEFAULT_
         if translated_text:
             await update.message.reply_text(
                 text=f"```\n{translated_text}\n```", 
-                parse_mode=ParseMode.MARKDOWN_V2
+                parse_mode=ParseMode.MARKDOWN_V2,
+                message_thread_id=update.message.message_thread_id
             )
-            # Видаляємо повідомлення користувача
             try:
                 await update.message.delete()
             except Exception as e:
                 print(f"Помилка видалення повідомлення користувача: {e}")
             
-            # Видаляємо повідомлення бота, якщо воно було збережене
             reply_message_id = context.user_data.get('reply_message_id')
             if reply_message_id:
                 try:
@@ -80,7 +77,6 @@ async def handle_translation_text(update: Update, context: ContextTypes.DEFAULT_
         print(f"Помилка при перекладі: {e}")
         await update.message.reply_text("шось пішло не так 🤷")
     
-    # Завершуємо розмову
     context.user_data.pop('command_message_id', None)
     context.user_data.pop('reply_message_id', None)
     return ConversationHandler.END
@@ -105,7 +101,10 @@ async def auto_translate_en_to_ua(update: Update, context: ContextTypes.DEFAULT_
             translated_text = translator.translate(text_to_translate)
             
             if translated_text:
-                await update.message.reply_text(f"🌐 {translated_text}")
+                await update.message.reply_text(
+                    f"🌐 {translated_text}",
+                    message_thread_id=update.message.message_thread_id
+                )
             else:
                 print("Ошибка автоматического перевода: не удалось перевести текст.")
     except Exception as e:

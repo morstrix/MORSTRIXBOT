@@ -58,7 +58,7 @@ async def _check_and_reply_subscription(update: Update, context: ContextTypes.DE
     try:
         chat_member = await context.bot.get_chat_member(chat_id=int(TELEGRAM_CHAT_ID), user_id=user_id)
         if chat_member.status not in ["member", "creator", "administrator"]:
-            keyboard = [[InlineKeyboardButton("ꜰ ☻‌ ʀ ᴜ ʍ", url="https://t.me/+EAWKIhjtolsyYWVi")]]
+            keyboard = [[InlineKeyboardButton("ꜰ ☻‌ ʀ ᴜ ʍ", url="https://t.me/+7Xmj6pPB0mEyMDky")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(
                 "тільки для членів клубу",
@@ -84,7 +84,10 @@ async def handle_gemini_message_group(update: Update, context: ContextTypes.DEFA
     reply = await _get_gemini_response(user_text)
     
     if reply:
-        await update.message.reply_text(reply)
+        await update.message.reply_text(
+            reply,
+            message_thread_id=update.message.message_thread_id
+        )
 
 async def handle_gemini_message_private(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """

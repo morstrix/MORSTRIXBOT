@@ -1,10 +1,2 @@
-# Файл с секретами
 .env
-
-# Виртуальное окружение Python
-venv/
-env/
-
-# Кэш Python
-__pycache__/
-*.pyc
+weather_chats.txt
