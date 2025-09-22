@@ -1,13 +1,9 @@
-import os
 from deep_translator import GoogleTranslator, exceptions
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler
-from dotenv import load_dotenv
-from langdetect import detect, DetectorFactory
 from telegram.constants import ParseMode
 
-load_dotenv()
-DetectorFactory.seed = 0
+# FIX: Видалено непотрібні імпорти (os, load_dotenv, langdetect)
 
 # Стан для ConversationHandler
 TRANSLATE_STATE = 1
@@ -16,8 +12,6 @@ async def translate_text_command(update: Update, context: ContextTypes.DEFAULT_T
     """
     Обробляє команду /translate, видаляє її та просить користувача ввести текст.
     """
-    context.user_data['command_message_id'] = update.message.message_id
-    
     try:
         await context.bot.delete_message(
             chat_id=update.effective_chat.id,
@@ -49,8 +43,11 @@ async def handle_translation_text(update: Update, context: ContextTypes.DEFAULT_
         translated_text = translator.translate(text_to_translate)
         
         if translated_text:
+            # Екранування символів для MarkdownV2
+            escaped_text = translated_text.replace('`', '\\`').replace('_', '\\_').replace('*', '\\*').replace('[', '\\[').replace(']', '\\]').replace('(', '\\(').replace(')', '\\)').replace('~', '\\~').replace('>', '\\>').replace('#', '\\#').replace('+', '\\+').replace('-', '\\-').replace('=', '\\=').replace('|', '\\|').replace('{', '\\{').replace('}', '\\}').replace('.', '\\.').replace('!', '\\!')
+            
             await update.message.reply_text(
-                text=f"```\n{translated_text}\n```", 
+                text=f"```\n{escaped_text}\n```", 
                 parse_mode=ParseMode.MARKDOWN_V2,
                 message_thread_id=update.message.message_thread_id
             )
@@ -77,35 +74,7 @@ async def handle_translation_text(update: Update, context: ContextTypes.DEFAULT_
         print(f"Помилка при перекладі: {e}")
         await update.message.reply_text("шось пішло не так 🤷")
     
-    context.user_data.pop('command_message_id', None)
     context.user_data.pop('reply_message_id', None)
     return ConversationHandler.END
 
-async def auto_translate_en_to_ua(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if context.user_data.get('state') == 'awaiting_translate':
-        return
-
-    if not update.message or not update.message.text:
-        return
-        
-    if update.message.text.startswith('/'):
-        return
-
-    text_to_translate = update.message.text.strip()
-    
-    try:
-        detected_lang = detect(text_to_translate)
-
-        if detected_lang == 'en':
-            translator = GoogleTranslator(source='en', target='uk')
-            translated_text = translator.translate(text_to_translate)
-            
-            if translated_text:
-                await update.message.reply_text(
-                    f"🌐 {translated_text}",
-                    message_thread_id=update.message.message_thread_id
-                )
-            else:
-                print("Ошибка автоматического перевода: не удалось перевести текст.")
-    except Exception as e:
-        print(f"Помилка автоматичного перекладу: {e}")
+# FIX: Видалено функцію auto_translate_en_to_ua

@@ -1,6 +1,4 @@
 import os
-import pytz
-import datetime
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -8,13 +6,13 @@ from telegram.ext import (
     filters,
     ChatJoinRequestHandler,
     CallbackQueryHandler,
-    JobQueue,
     ConversationHandler
 )
 from telegram import Update
 from telegram.ext import ContextTypes
 from dotenv import load_dotenv
 
+# CHANGE: Видалено непотрібні імпорти
 from ai import handle_gemini_message_group, handle_gemini_message_private
 from handlers import (
     handle_new_members,
@@ -26,14 +24,13 @@ from handlers import (
     AWAITING_LINK
 )
 from safe import check_links
-from weather import weather_command, post_weather_job, _get_all_chat_ids
+from weather import weather_command
 from support import support_command, handle_private_message, handle_reply_button
-from translator import translate_text_command, handle_translation_text, auto_translate_en_to_ua, TRANSLATE_STATE
+from translator import translate_text_command, handle_translation_text, TRANSLATE_STATE
 
 load_dotenv()
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-SUPPORT_ID = os.getenv("SUPPORT_ID")
 RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL")
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -41,23 +38,6 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['state'] = 'support'
         await update.message.reply_text("катай меседж")
 
-def schedule_weather_jobs(job_queue: JobQueue):
-    """
-    Заплановує щоденну роботу для розсилки погоди у всі зареєстровані чати.
-    """
-    chat_ids = _get_all_chat_ids()
-    if not chat_ids:
-        print("Немає зареєстрованих чатів для розсилки погоди. Зареєструйте чат, відправивши /weather.")
-        return
-
-    for chat_id in chat_ids:
-        job_queue.run_daily(
-            post_weather_job,
-            datetime.time(hour=7, minute=0, tzinfo=pytz.timezone('Europe/Kyiv')),
-            chat_id=chat_id,
-            name=f'weather_job_{chat_id}'
-        )
-        print(f"Щоденна розсилка погоди запланована для чату: {chat_id}")
 
 def main():
     if not TELEGRAM_BOT_TOKEN:
@@ -83,7 +63,7 @@ def main():
     )
     application.add_handler(translate_conv_handler)
 
-    # Новий обробник для скарг на YouTube Music
+    # Обробник для скарг
     complaint_conv_handler = ConversationHandler(
         entry_points=[CallbackQueryHandler(start_complaint, pattern='^start_complaint$')],
         states={
@@ -108,19 +88,14 @@ def main():
     link_filters = filters.Entity("url") | filters.Entity("text_link")
     application.add_handler(MessageHandler(link_filters & filters.ChatType.GROUPS, check_links))
 
-    # Обробники для групових чатів
-    application.add_handler(MessageHandler(
-        filters.TEXT & filters.ChatType.GROUPS & ~filters.COMMAND & ~link_filters,
-        auto_translate_en_to_ua
-    ))
-
+    # Обробник тригера "ало" в групі
     application.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND & filters.Regex(r'(?i)ало') & filters.ChatType.GROUPS,
         handle_gemini_message_group
     ))
     
-    # Плануємо щоденну розсилку погоди для вже зареєстрованих чатів
-    schedule_weather_jobs(application.job_queue)
+    # FIX: Видалено планувальник завдань для погоди
+    # FIX: Видалено обробник для авто-перекладу
 
     if os.getenv("RENDER") == "true":
         print("Запуск бота в режимі вебхуків для Render.")
@@ -130,8 +105,7 @@ def main():
             url_path=TELEGRAM_BOT_TOKEN,
             webhook_url=f"{RENDER_EXTERNAL_URL}/{TELEGRAM_BOT_TOKEN}"
         )
-    else:
-        print("Запуск бота в режимі long-polling для локального тестування.")
+    else print("Запуск бота в режимі long-polling для локального тестування.")
         application.run_polling()
 
 if __name__ == '__main__':
