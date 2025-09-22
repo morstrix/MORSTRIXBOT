@@ -105,7 +105,8 @@ def main():
             url_path=TELEGRAM_BOT_TOKEN,
             webhook_url=f"{RENDER_EXTERNAL_URL}/{TELEGRAM_BOT_TOKEN}"
         )
-    else print("Запуск бота в режимі long-polling для локального тестування.")
+    else:
+        print("Запуск бота в режимі long-polling для локального тестування.")
         application.run_polling()
 
 if __name__ == '__main__':
