@@ -1,7 +1,7 @@
-python-telegram-bot[job-queue, webhooks]
-python-dotenv
+python-telegram-bot
 google-generativeai
 deep-translator
 langdetect
 requests
 pytz
+python-dotenv

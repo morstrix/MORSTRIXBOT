@@ -7,7 +7,7 @@ from telegram.ext import (
     ChatJoinRequestHandler,
     CallbackQueryHandler,
     ConversationHandler,
-    JobQueue
+    JobQueue  # Обязательно импортируем JobQueue
 )
 from telegram import Update
 from telegram.ext import ContextTypes
