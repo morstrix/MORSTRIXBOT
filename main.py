@@ -6,7 +6,8 @@ from telegram.ext import (
     filters,
     ChatJoinRequestHandler,
     CallbackQueryHandler,
-    ConversationHandler
+    ConversationHandler,
+    JobQueue
 )
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -39,17 +40,17 @@ def main():
         print("Ошибка: TELEGRAM_BOT_TOKEN не найден в .env файле.")
         return
 
-    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-
+    # Изменения для исправления ошибки JobQueue
+    job_queue = JobQueue()
+    application = Application.builder().token(TELEGRAM_BOT_TOKEN).job_queue(job_queue).build()
+    
     # Обробники команд
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("weather", weather_command))
     application.add_handler(CommandHandler("support", support_command))
-    application.add_handler(CommandHandler("translate", translate_text_command))
-    application.add_handler(CallbackQueryHandler(handle_callback_query, pattern="^show_rules$"))
-    application.add_handler(CallbackQueryHandler(handle_reply_button, pattern="^reply_to_"))
+    application.add_handler(CallbackQueryHandler(handle_callback_query))
     
-    # Обробники для перекладу
+    # Обробник для перекладу
     translate_conv_handler = ConversationHandler(
         entry_points=[CommandHandler("translate", translate_text_command)],
         states={
@@ -88,8 +89,8 @@ def main():
             webhook_url=f"{RENDER_EXTERNAL_URL}/{TELEGRAM_BOT_TOKEN}"
         )
     else:
-        print("Запуск бота в режимі поллінгу для локального тестування.")
-        application.run_polling(allowed_updates=Update.ALL_TYPES)
+        print("Запуск бота в режимі Long Polling.")
+        application.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
     main()
