@@ -1,5 +1,6 @@
 import os
 import time
+# ✅ Видалено ChatMember, залишено Chat
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Chat
 from telegram.ext import ContextTypes
 from dotenv import load_dotenv
@@ -78,6 +79,7 @@ async def _get_gemini_response(user_text):
 async def _check_and_reply_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """
     Проверяет, является ли пользователь участником целевого чата.
+    Использует строковые константы статуса для старых версий python-telegram-bot.
     """
     if not TELEGRAM_CHAT_ID:
         return True
@@ -93,6 +95,8 @@ async def _check_and_reply_subscription(update: Update, context: ContextTypes.DE
             user_id=user_id
         )
         
+        # ✅ ИСПРАВЛЕНИЕ: Используем строковые значения, так как константы Chat.MEMBER не найдены.
+        # Эти строковые значения универсальны для всех версий Telegram API.
         is_member = chat_member.status in [
             'member', 'administrator', 'creator'
         ]
@@ -104,6 +108,7 @@ async def _check_and_reply_subscription(update: Update, context: ContextTypes.DE
             )
             return False
     except Exception as e:
+        # Эта ветка обрабатывает ошибки, связанные с неправильным ID чата или правами бота.
         print(f"Помилка перевірки підписки для користувача {user_id}: {e}")
         await update.message.reply_text("не можу перевірити підписку") 
         return False
@@ -135,7 +140,7 @@ async def handle_gemini_message_private(update: Update, context: ContextTypes.DE
     """
     Обрабатывает любое сообщение в личном чате с ботом (только текст).
     """
-    # ❌ ВИДАЛЕНО: if context.user_data.get('state') == 'support': return
+    # УДАЛЕНО: if context.user_data.get('state') == 'support': return
 
     user_text = update.message.text
     
