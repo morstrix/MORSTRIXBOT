@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drafts Grid</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    
+    <style>
+        /* ================================================= */
+        /* ВИЗУАЛЬНЫЙ СТИЛЬ: Пиксельная палитра и шрифт */
+        /* ================================================= */
+        :root {
+            --color-bg: #000000;          /* Черный фон */
+            --color-dark-green: #013220;  /* Темно-зеленый (фон ячеек) */
+            --color-light-green: #00FF00; /* Светло-зеленый (пиксельные элементы) */
+        }
+        
+        body {
+            background-color: var(--color-bg);
+            color: var(--color-light-green);
+            font-family: 'Press Start 2P', monospace;
+            padding: 10px;
+            margin: 0;
+            overflow-x: hidden;
+            user-select: none;
+            cursor: default;
+        }
+
+        /* ================================================= */
+        /* ИНТЕРФЕЙС: Шапка и Сетка */
+        /* ================================================= */
+
+        #header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--color-light-green); /* Эффект терминальной линии */
+            margin-bottom: 15px;
+        }
+
+        #monster-logo {
+            /* 2GAME-LOGO.jpg - Логотип монстра */
+            width: 80px; 
+            height: auto;
+            image-rendering: pixelated;
+        }
+
+        #back-button {
+            /* 5463093809924670725 копия.jpg - Иконка Helper/Back */
+            background: none;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            line-height: 0; 
+        }
+
+        #back-button img {
+            width: 30px;
+            height: 30px;
+            image-rendering: pixelated;
+            filter: drop-shadow(0 0 2px var(--color-light-green)); /* Пиксельный свечение */
+        }
+        
+        #grid-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr); /* 3 колонки */
+            gap: 5px; /* Пиксельное расстояние */
+            max-width: 100%;
+        }
+
+        .grid-cell {
+            background-color: var(--color-dark-green);
+            border: 2px solid var(--color-light-green);
+            min-height: 100px;
+            padding: 8px;
+            cursor: pointer;
+            font-size: 8px; /* Пиксельный шрифт маленький */
+            word-wrap: break-word;
+            overflow: hidden;
+            position: relative;
+            transition: all 0.05s linear;
+        }
+
+        .grid-cell:hover {
+            box-shadow: 0 0 5px var(--color-light-green); /* Эффект сканирующего курсора */
+            opacity: 0.9;
+        }
+
+        .empty-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: rgba(0, 255, 0, 0.4);
+        }
+
+        .content-type {
+            font-size: 6px;
+            color: var(--color-light-green);
+            position: absolute;
+            top: 2px;
+            right: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="header">
+        <img id="monster-logo" src="2GAME-LOGO.jpg" alt="Monster Logo">
+        <button id="back-button" onclick="window.Telegram.WebApp.close()">
+            <img src="5463093809924670725 копия.jpg" alt="Back Button">
+        </button>
+    </div>
+
+    <div id="grid-container">
+        </div>
+
+    <script>
+        // Проверка, что мы внутри Telegram WebApp
+        if (window.Telegram && window.Telegram.WebApp) {
+            window.Telegram.WebApp.ready();
+        }
+
+        const GRID_SIZE = 15; // 3 ряда * 5 колонок (по умолчанию)
+        const STORAGE_KEY = 'pixelDrafts_v1';
+
+        // ================================================= 
+        // 💾 ЛОКАЛЬНОЕ ХРАНЕНИЕ (LocalStorage)
+        // =================================================
+
+        function loadDrafts() {
+            try {
+                const draftsJson = localStorage.getItem(STORAGE_KEY);
+                if (draftsJson) {
+                    const drafts = JSON.parse(draftsJson);
+                    // Убеждаемся, что размер массива соответствует текущему размеру сетки
+                    if (drafts.length === GRID_SIZE) {
+                        return drafts;
+                    }
+                }
+            } catch (e) {
+                console.error("Ошибка чтения LocalStorage:", e);
+            }
+            // Если данных нет, или они некорректны, создаем пустую сетку
+            return Array(GRID_SIZE).fill({ type: 'empty', content: '' });
+        }
+
+        function saveDrafts(drafts) {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(drafts));
+            } catch (e) {
+                console.error("Ошибка записи LocalStorage:", e);
+                alert("Ошибка: Не удалось сохранить данные локально.");
+            }
+        }
+
+        // ================================================= 
+        // 🎨 РЕНДЕРИНГ И ЛОГИКА UI
+        // =================================================
+
+        let currentDrafts = loadDrafts();
+        const gridContainer = document.getElementById('grid-container');
+
+        function handleCellClick(index) {
+            const draft = currentDrafts[index];
+            const currentContent = draft.content || '';
+
+            // Модальное окно для выбора типа и ввода текста
+            const inputResult = prompt(`ЯЧЕЙКА #${index + 1}\nВведите текст или оставьте пустым для очистки:\n(Добавить #ART или #PUSH в начало для смены типа)`, currentContent);
+
+            if (inputResult === null) {
+                return; // Отмена
+            }
+
+            let newContent = inputResult.trim();
+            let newType = 'text';
+
+            if (newContent.toLowerCase().startsWith('#art')) {
+                newType = 'art';
+                newContent = newContent.substring(4).trim();
+            } else if (newContent.toLowerCase().startsWith('#push')) {
+                newType = 'push';
+                newContent = newContent.substring(5).trim();
+            } else if (newContent === '') {
+                newType = 'empty';
+            }
+
+            // Обновляем данные
+            currentDrafts[index] = { 
+                type: newType, 
+                content: newContent 
+            };
+            
+            saveDrafts(currentDrafts);
+            renderGrid(); // Перерисовываем сетку
+        }
+
+        function getEmoji(type) {
+            switch (type) {
+                case 'art': return '🖼️';
+                case 'push': return '🔔';
+                case 'text': return '📝';
+                default: return '';
+            }
+        }
+
+        function renderGrid() {
+            gridContainer.innerHTML = ''; // Очистка
+            
+            // Если нужно 5 колонок, увеличиваем ширину контейнера
+            gridContainer.style.gridTemplateRows = `repeat(${Math.ceil(GRID_SIZE / 3)}, auto)`;
+
+
+            currentDrafts.forEach((draft, index) => {
+                const cell = document.createElement('div');
+                cell.className = 'grid-cell';
+                cell.onclick = () => handleCellClick(index); 
+
+                if (draft.type === 'empty' || draft.content === '') {
+                    cell.innerHTML = `<span class="empty-text">ПУСТО</span>`;
+                } else {
+                    const typeLabel = document.createElement('div');
+                    typeLabel.className = 'content-type';
+                    typeLabel.textContent = `${getEmoji(draft.type)} ${draft.type.toUpperCase()}`;
+                    cell.appendChild(typeLabel);
+                    
+                    const contentText = document.createElement('div');
+                    contentText.textContent = draft.content.substring(0, 150) + (draft.content.length > 150 ? '...' : '');
+                    cell.appendChild(contentText);
+                }
+
+                gridContainer.appendChild(cell);
+            });
+        }
+
+        // Запускаем отрисовку при загрузке страницы
+        renderGrid();
+    </script>
+</body>
+</html>
