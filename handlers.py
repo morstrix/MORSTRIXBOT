@@ -5,7 +5,7 @@ from telegram.ext import ContextTypes, ConversationHandler
 import asyncio
 
 # !!! ОЧЕНЬ ВАЖНО: ЗАМЕНИТЕ ЭТУ ССЫЛКУ на URL вашего WebApp (где будет лежать drafts_grid.html) !!!
-WEBAPP_URL = "https://github.com/morstrix" 
+WEBAPP_URL = "https://morstrix.github.io/MORSTRIXBOT/drafts_grid.html" 
 
 RULES_MESSAGE = "для зʙ'язᴋу з ʜᴇйᴘoxᴇʌпᴇᴘoᴍ - зʜɪᴍᴀй ᴋᴀᴄᴛᴘюʌю i ᴋᴏᴘиᴄᴛуйся ᴛᴘигᴇᴘом: ᴀʌо"
 

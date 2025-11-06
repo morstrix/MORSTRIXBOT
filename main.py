@@ -13,17 +13,18 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from dotenv import load_dotenv
 
+# ✅ ФІКС: ІМПОРТУЄМО ОБИДВА ХЕНДЛЕРИ З AI
 from ai import handle_gemini_message_group, handle_gemini_message_private
 from handlers import (
     handle_new_members,
     handle_join_request,
     handle_callback_query,
-    # НОВЫЙ ИМПОРТ
+    # ✅ ІМПОРТ ДЛЯ MINI APP
     open_drafts_webapp
 )
 from safe import check_links
 from weather import weather_command
-# УДАЛЕНО: from support import support_command, handle_private_message, handle_reply_button 
+# ❌ ВИДАЛЕНО: from support import support_command, handle_private_message, handle_reply_button 
 from translator import translate_text_command, handle_translation_text, TRANSLATE_STATE
 
 load_dotenv()
@@ -32,7 +33,7 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL")
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # ЛОГИКА /start ДЛЯ САППОРТА УДАЛЕНА
+    # Логіка /start для саппорта видалена, залишаємо базову відповідь
     await update.message.reply_text("🖖")
 
 
@@ -47,9 +48,9 @@ def main():
     # Обробники для команд
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("weather", weather_command))
-    # НОВЫЙ ОБРАБОТЧИК ДЛЯ MINI APP
+    # ✅ ДОДАНО: ОБРОБНИК ДЛЯ MINI APP
     application.add_handler(CommandHandler("drafts", open_drafts_webapp, filters.ChatType.PRIVATE))
-    # УДАЛЕНО: application.add_handler(CommandHandler("support", support_command, filters.ChatType.GROUPS | filters.ChatType.PRIVATE)) 
+    # ❌ ВИДАЛЕНО: application.add_handler(CommandHandler("support", support_command)) 
 
     # Обробник кнопок InlineKeyboard (для правил)
     application.add_handler(CallbackQueryHandler(handle_callback_query))
@@ -68,19 +69,18 @@ def main():
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members))
     application.add_handler(ChatJoinRequestHandler(handle_join_request))
 
-    # Обробники для особистих повідомлень (тепер только Gemini)
+    # ✅ ВИПРАВЛЕНО: ОБРОБНИК ДЛЯ ОСОБИСТИХ ПОВІДОМЛЕНЬ ТЕПЕР ВИКОРИСТОВУЄ handle_gemini_message_private
     application.add_handler(MessageHandler(
         (filters.TEXT | filters.PHOTO | filters.Document.ALL) & filters.ChatType.PRIVATE & ~filters.COMMAND,
         handle_gemini_message_private
     ))
-    # УДАЛЕН ОБРАБОТЧИК: handle_private_message (был для саппорта)
-    # УДАЛЕН ОБРАБОТЧИК: handle_reply_button (был для саппорта)
+    # ❌ ВИДАЛЕНО: Обробники для саппорта були тут
 
     # Обробник посилань
     link_filters = filters.Entity("url") | filters.Entity("text_link")
     application.add_handler(MessageHandler(link_filters & filters.ChatType.GROUPS, check_links))
 
-    # Обробник тригера "ало" в групі
+    # Обробник тригера "ало" в групі (залишається)
     application.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND & filters.Regex(r'(?i)ало') & filters.ChatType.GROUPS,
         handle_gemini_message_group

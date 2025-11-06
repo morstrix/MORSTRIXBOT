@@ -1,5 +1,3 @@
-# ai.py
-
 import os
 import time
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Chat
@@ -31,17 +29,113 @@ last_request_time = 0
 MIN_DELAY_SECONDS = 60
 
 SYSTEM_PROMPT = (
-    "Ты — бот-помощник, который отвечает коротко, культурно, конструктивно и грамотным украин..."
+    "Ты — бот-помощник, который отвечает коротко, культурно, конструктивно и грамотным украинским языком. "
+    "Каждый твой ответ должен содержать эмодзи, соответствующий контексту и быть максимально полезным. "
 )
 
-# ... (остальные функции _get_gemini_response, _check_and_reply_subscription, handle_gemini_message_group остаются без изменений)
+async def _get_gemini_response(user_text):
+    """
+    Получает ответ от Gemini (только текст).
+    """
+    global last_request_time
 
+    current_time = time.time()
+    if current_time - last_request_time < MIN_DELAY_SECONDS:
+        remaining_time = int(MIN_DELAY_SECONDS - (current_time - last_request_time))
+        return f"почекай трохи 🫩 відпочину {remaining_time}"
+
+    if not GEMINI_API_KEY:
+        print("API ключ не настроен. Невозможно получить ответ.")
+        return "у мене немає api ключа 🔑"
+
+    try:
+        model = genai.GenerativeModel(MODEL_NAME, system_instruction=SYSTEM_PROMPT) 
+        
+        response = model.generate_content(
+            user_text
+        )
+
+        last_request_time = current_time
+        return response.text
+
+    except GoogleAPICallError as e:
+        error_message = str(e)
+        print(f"Ошибка при работе с Gemini API: {error_message}")
+        if "401" in error_message or "Invalid API Key" in error_message:
+            return "ой 😔, мій API ключ не дійсний"
+        elif "429" in error_message or "Rate limit exceeded" in error_message:
+            return "забагато запитів 🥵, почекай хвилину"
+        elif "404" in error_message:
+             return "помилка 404 🧐: модель не знайдена. Перевір ім'я моделі в ai.py."
+        else:
+            return f"не можу відповісти 🤯: {error_message[:50]}..." 
+
+    except Exception as e:
+        print(f"Неизвестная ошибка: {e}")
+        return "щось зламалось 💔"
+
+
+async def _check_and_reply_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """
+    Проверяет, является ли пользователь участником целевого чата.
+    """
+    if not TELEGRAM_CHAT_ID:
+        return True
+
+    user_id = update.effective_user.id
+    
+    keyboard = [[InlineKeyboardButton(FORUM_BUTTON_TEXT, url=FORUM_INVITE_LINK)]] 
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    try:
+        chat_member = await context.bot.get_chat_member(
+            chat_id=TELEGRAM_CHAT_ID,
+            user_id=user_id
+        )
+        
+        is_member = chat_member.status in [
+            'member', 'administrator', 'creator'
+        ]
+
+        if not is_member:
+            await update.message.reply_text(
+                "тільки для членів клубу",
+                reply_markup=reply_markup
+            )
+            return False
+    except Exception as e:
+        print(f"Помилка перевірки підписки для користувача {user_id}: {e}")
+        await update.message.reply_text("не можу перевірити підписку") 
+        return False
+    
+    return True
+
+async def handle_gemini_message_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Обрабатывает сообщения в групповом чате, содержащие слово "ало" (только текст).
+    """
+    if not await _check_and_reply_subscription(update, context):
+        return
+
+    if not update.message.text:
+        return
+
+    await update.message.reply_chat_action("typing")
+    user_text = update.message.text
+    
+    reply = await _get_gemini_response(user_text)
+    
+    if reply:
+        await update.message.reply_text(
+            reply,
+            message_thread_id=update.message.message_thread_id
+        )
 
 async def handle_gemini_message_private(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Обрабатывает любое сообщение в личном чате с ботом (только текст).
     """
-    # УДАЛЕНО: if context.user_data.get('state') == 'support': return
+    # ❌ ВИДАЛЕНО: if context.user_data.get('state') == 'support': return
 
     user_text = update.message.text
     
@@ -54,9 +148,6 @@ async def handle_gemini_message_private(update: Update, context: ContextTypes.DE
     await update.message.reply_chat_action("typing")
     
     reply = await _get_gemini_response(user_text)
-
+    
     if reply:
-        await update.message.reply_text(
-            reply,
-            message_thread_id=update.message.message_thread_id
-        )
+        await update.message.reply_text(reply)
