@@ -13,25 +13,24 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from dotenv import load_dotenv
 
-# Імпорти ваших модулів
+# Импорты ваших модулей (Модуль support УДАЛЕН)
 from ai import handle_gemini_message_group, handle_gemini_message_private
 from handlers import (
     handle_new_members,
     handle_join_request,
     handle_callback_query,
-    open_drafts_webapp # Переконайтеся, що ця функція є у handlers.py
+    open_drafts_webapp
 )
 from safe import check_links
 from weather import weather_command
-from support import support_command, handle_private_message, handle_reply_button
 from translator import translate_text_command, handle_translation_text, TRANSLATE_STATE
 
 
 # ----------------------------------------------------
-# 🛡️ БЕЗПЕЧНЕ ЗАВАНТАЖЕННЯ ЗМІННИХ СЕРЕДОВИЩА 🛡️
+# 🛡️ БЕЗОПАСНАЯ ЗАГРУЗКА ПЕРЕМЕННЫХ СРЕДЫ 🛡️
 # ----------------------------------------------------
 
-# Завантажуємо .env тільки локально. На Render змінні вже є.
+# Загружаем .env только локально. На Render переменные уже есть.
 if os.getenv("RENDER") != "true":
     load_dotenv()
 
@@ -40,9 +39,8 @@ RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL")
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if context.args and context.args[0] == 'support':
-        context.user_data['state'] = 'support'
-        await update.message.reply_text("катай меседж")
+    # Упрощенная логика /start, так как support удален
+    await update.message.reply_text("Бот запущен.")
 
 
 def main():
@@ -56,18 +54,18 @@ def main():
     job_queue.initialize(application)
     
     # ----------------------------------------------------
-    #          Реєстрація Обробників (Handlers)
+    #          Регистрация Обработчиков (Handlers)
     # ----------------------------------------------------
     
     # Обробники команд
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("weather", weather_command, filters.ChatType.GROUPS | filters.ChatType.PRIVATE))
-    application.add_handler(CommandHandler("support", support_command, filters.ChatType.GROUPS))
     application.add_handler(CommandHandler("drafts", open_drafts_webapp, filters.ChatType.PRIVATE))
-
+    # Команда /support УДАЛЕНА
+    
     # Обробник кнопок
     application.add_handler(CallbackQueryHandler(handle_callback_query, pattern="show_rules"))
-    application.add_handler(CallbackQueryHandler(handle_reply_button, pattern="^reply_to_"))
+    # handle_reply_button УДАЛЕН
 
     # Обробник перекладача (ConversationHandler)
     translate_conv_handler = ConversationHandler(
@@ -83,13 +81,7 @@ def main():
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members))
     application.add_handler(ChatJoinRequestHandler(handle_join_request))
 
-    # Обробники для особистих повідомлень
-    application.add_handler(MessageHandler(
-        (filters.TEXT | filters.PHOTO | filters.Document.ALL) & filters.ChatType.PRIVATE & ~filters.COMMAND,
-        handle_private_message
-    ))
-    
-    # Обробник особистих повідомлень для Gemini
+    # Обробчики личных сообщений (осталась только логика Gemini)
     application.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE,
         handle_gemini_message_private
@@ -106,22 +98,21 @@ def main():
     ))
     
     # ----------------------------------------------------
-    #            💥 ФІКС WEBHOOK (Render) 💥
+    #            💥 ФИКС WEBHOOK (Render) 💥
     # ----------------------------------------------------
 
     if os.getenv("RENDER") == "true":
         
-        # 1. Очищуємо базовий URL від слішів
-        # .rstrip('/') видаляє кінцевий сліш, якщо він є.
+        # 1. Очищаем базовый URL от слэшей
         base_url = RENDER_EXTERNAL_URL.rstrip('/') if RENDER_EXTERNAL_URL else ""
         
-        # 2. Створюємо правильний Webhook URL
+        # 2. Создаем правильный Webhook URL
         full_webhook_url = f"{base_url}/{TELEGRAM_BOT_TOKEN}"
         
-        # !!! ДІАГНОСТИЧНИЙ ВИВІД !!!
+        # !!! КРИТИЧЕСКИ ВАЖНАЯ ДИАГНОСТИКА !!!
         print(f"WEBHOOK_URL (DEBUG): [{full_webhook_url}]") 
-        print("Запуск бота в режимі вебхуків для Render.")
-        # !!! ДІАГНОСТИЧНИЙ ВИВІД !!!
+        print("Запуск бота в режиме вебхуков для Render.")
+        # !!! КРИТИЧЕСКИ ВАЖНАЯ ДИАГНОСТИКА !!!
 
         application.run_webhook(
             listen="0.0.0.0",
@@ -131,8 +122,8 @@ def main():
             max_connections=50
         )
     else:
-        # Для локального запуску
-        print("Запуск бота в режимі опитування (Polling).")
+        # Для локального запуска
+        print("Запуск бота в режиме опроса (Polling).")
         application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
