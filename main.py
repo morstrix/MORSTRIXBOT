@@ -30,7 +30,7 @@ from translator import translate_text_command, handle_translation_text, TRANSLAT
 load_dotenv()
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL")
+RENDER_EXTERNAL_URL = os.getenv("https://morstrixbot.onrender.com/")
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Логіка /start для саппорта видалена, залишаємо базову відповідь
