@@ -5,7 +5,8 @@ import asyncio
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
     ChatJoinRequestHandler, CallbackQueryHandler, JobQueue,
-    ConversationHandler 
+    ConversationHandler,
+    UpdateType # <--- ДОБАВЛЕНО
 )
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup 
 from telegram.ext import ContextTypes
