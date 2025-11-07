@@ -4,21 +4,22 @@ import os
 import asyncio
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
-    ChatJoinRequestHandler, CallbackQueryHandler, JobQueue
+    ChatJoinRequestHandler, CallbackQueryHandler, JobQueue,
+    ConversationHandler 
 )
 from telegram import Update
 from telegram.ext import ContextTypes
+from telegram.constants import ParseMode
 from dotenv import load_dotenv
-from aiohttp import web # ✅ Используем aiohttp для асинхронного Webhook/Web App сервера
+from aiohttp import web 
 
 # Импорты ваших модулей
 from ai import handle_gemini_message_group, handle_gemini_message_private
 from handlers import (
     handle_new_members, handle_join_request, handle_callback_query,
-    open_drafts_webapp, handle_webapp_data, font_command
+    font_start, font_get_text, font_cancel,
 )
-# Вынесли функционал Web App в отдельный модуль
-import webapp_server 
+from safe import check_links 
 
 # ----------------------------------------------------
 # 🛡️ КОНФИГУРАЦИЯ
@@ -36,57 +37,95 @@ PORT = int(os.environ.get("PORT", 8080))
 # ----------------------------------------------------
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Бот запущен и готов к работе.")
+    await update.message.reply_text(
+        "ᴡᴇʟᴄᴏᴍᴇ \n\n"
+        "фунᴋціᴏнᴀʌ:\n"
+        "➞ /font - ᴛᴇᴋᴄᴛ ᴄᴛᴀйʌᴇᴘ \n"
+        "➞ ᴀʙᴛᴏпᴘийᴏᴍ зᴀяʙᴏᴋ\n"
+        "➞ пᴇᴘᴇʙіᴘᴋᴀ пᴏᴄиʌᴀнь\n\n"
+        "➞ ШІ — дʌя чʌᴇніʙ ᴋʌубу.\n"
+        "ᴛᴘигᴇᴘ ᴀʌᴏ у гᴘʏпі.\n\n"
+        "➞ ʜᴇʟᴘᴇʀ: ɴᴏᴛᴇ/ᴀʀᴛ/ᴘᴜꜱʜ",
+        parse_mode=ParseMode.MARKDOWN
+    )
 
 # Инициализация объекта application
 job_queue = JobQueue()
 application = Application.builder().token(TELEGRAM_BOT_TOKEN).job_queue(job_queue).build()
 
+# 🆕 СТАНИ ДЛЯ FONT_HANDLER
+FONT_START, FONT_GET_TEXT = range(2)
+
 
 # Регистрация Обработчиков
 application.add_handler(CommandHandler("start", start_command))
-application.add_handler(CommandHandler("drafts", open_drafts_webapp, filters.ChatType.PRIVATE))
-application.add_handler(CommandHandler("font", font_command, filters.ChatType.ALL)) # /font теперь команда, а не ConversationHandler
+
+# 💥 FONT CONVERSATION HANDLER 💥
+font_conv_handler = ConversationHandler(
+    entry_points=[CommandHandler("font", font_start)],
+    states={
+        FONT_START: [MessageHandler(filters.TEXT & ~filters.COMMAND, font_get_text)],
+        FONT_GET_TEXT: [MessageHandler(filters.TEXT & ~filters.COMMAND, font_get_text)], 
+    },
+    fallbacks=[CommandHandler("cancel", font_cancel)],
+    allow_reentry=True
+)
+
+application.add_handler(font_conv_handler)
+
 
 application.add_handler(CallbackQueryHandler(handle_callback_query)) 
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members))
 application.add_handler(ChatJoinRequestHandler(handle_join_request))
 
-# === Обработка WebApp Data
-application.add_handler(MessageHandler(
-    filters.StatusUpdate.WEB_APP_DATA,
-    handle_webapp_data
-))
-
-# Обработчики Gemini 
+# Обработчики Gemini (ІІ з перевіркою)
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_gemini_message_private))
 application.add_handler(MessageHandler(
     filters.TEXT & ~filters.COMMAND & filters.Regex(r'(?i)ало') & filters.ChatType.GROUPS,
     handle_gemini_message_group
 ))
-# Если захотите добавить проверку ссылок:
-# link_filters = filters.Entity("url") | filters.Entity("text_link")
-# application.add_handler(MessageHandler(link_filters & filters.ChatType.GROUPS, check_links))
+
+# ✅ Обробник для перевірки посилань (автоматичний)
+link_filters = filters.Entity("url") | filters.Entity("text_link")
+application.add_handler(MessageHandler(link_filters & filters.ChatType.GROUPS, check_links))
 
 
 # ----------------------------------------------------
-#           💥 Webhook и Web App Server (aiohttp) 💥
+#           💥 Webhook Server (aiohttp) 💥
 # ----------------------------------------------------
 
-# Загружаем логику сервера Web App из webapp_server.py
 async def start_webhook_server(application: Application):
-    """Настраивает и запускает aiohttp сервер для Webhook и Web App."""
+    """Настраивает и запускает aiohttp сервер для Webhook."""
     
     # 1. Настройка aiohttp
     app = web.Application()
 
     # 2. Добавляем Webhook Telegram
     webhook_path = f'/{TELEGRAM_BOT_TOKEN}'
-    app.router.add_post(webhook_path, webapp_server.handle_telegram_webhook)
+    
+    async def handle_telegram_webhook(request):
+        """Обрабатывает запросы Webhook от Telegram."""
+        bot_app = request.app['bot_app']
+        
+        if request.content_length > 10**6: 
+            print("Запрос слишком большой, игнорируется.")
+            return web.Response(text="request too large", status=413)
+            
+        try:
+            data = await request.json()
+        except Exception as e:
+            print(f"Ошибка получения JSON: {e}")
+            return web.Response(text="bad request", status=400)
+            
+        await bot_app.update_queue.put(Update.de_json(data=data, bot=bot_app.bot))
+        return web.Response(text="ok", status=200)
 
-    # 3. Добавляем маршруты Web App
-    app.router.add_get('/', webapp_server.handle_index)
-    app.router.add_get('/drafts', webapp_server.handle_drafts_html) # Ваш HTML-файл
+    app.router.add_post(webhook_path, handle_telegram_webhook)
+
+    # 3. Добавляем простой health check
+    async def handle_health_check(request):
+        return web.Response(text="Bot is running!", status=200)
+    app.router.add_get('/', handle_health_check)
     
     # Добавляем объект Application и Bot в контекст aiohttp
     app['bot_app'] = application
@@ -108,16 +147,16 @@ async def start_webhook_server(application: Application):
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', PORT)
-    print(f"Запуск aiohttp Web App на порту {PORT}")
+    print(f"Запуск aiohttp Webhook Server на порту {PORT}")
     await site.start()
     
     # Бесконечный цикл, пока bot_app работает
     await application.start()
     await application.updater.start_polling()
 
-# ----------------------------------------------------
+# ----------------------------------------------------\
 #                      Запуск
-# ----------------------------------------------------
+# ----------------------------------------------------\
 
 def main():
     if os.getenv("RENDER") == "true":

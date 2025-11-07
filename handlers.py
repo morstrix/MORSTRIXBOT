@@ -2,39 +2,33 @@
 
 import os
 import re
-import json
-import datetime
-import base64
-import io
-from uuid import uuid4
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
-from telegram.ext import ContextTypes
-from telegram.constants import ChatType, ParseMode
-from PIL import Image
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import ContextTypes, ConversationHandler, CallbackContext 
+from telegram.constants import ParseMode
 from dotenv import load_dotenv
 
-# ✅ НОВЫЕ ИМПОРТЫ
-from font_utils import convert_text_to_font
+# ✅ НОВІ ІМПОРТИ для font
+from font_utils import convert_text_to_font 
 
-# Загружаем переменные окружения
+# Визначення станів діалогу
+FONT_TEXT = 0
+
+# Завантажуємо змінні оточення
 if os.getenv("RENDER") != "true":
     load_dotenv()
 
-RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL")
-
-# --- Обробник нових учасників ---
+# --- Обробник нових учасників (Автопривітання) ---
 async def handle_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for member in update.message.new_chat_members:
         if not member.is_bot:
             
             # Кнопка для правил
-            keyboard = [[InlineKeyboardButton("Показати Правила", callback_data="show_rules")]]
+            keyboard = [[InlineKeyboardButton("пᴘᴀʙиʌᴀ", callback_data="show_rules")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             welcome_message = (
-                f"Привіт, {member.full_name}! 👋\n"
-                f"Ласкаво просимо до нашої спільноти. \n"
-                f"Будь ласка, ознайомтеся з правилами."
+                f"ᴀйо {member.full_name}! \n"
+                f"ᴏзнᴀйᴏᴍᴛᴇᴄя з пᴘᴀʙиʌᴀᴍи."
             )
             
             # Перевіряємо, чи це група з темами (форум)
@@ -46,174 +40,142 @@ async def handle_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 message_thread_id=thread_id
             )
 
-# --- Обробник запитів на приєднання ---
+# --- Обробник запитів на приєднання (Автоприйом заявок + Автосмс) ---
 async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.chat.id
     user_id = update.from_user.id
+    user_full_name = update.from_user.full_name
+    
     try:
+        # 1. Автоприйом
         await context.bot.approve_chat_join_request(chat_id=chat_id, user_id=user_id)
+        
+        # 2. Автосмс (приватне повідомлення після схвалення)
+        await context.bot.send_message(
+            user_id, 
+            f"✅ {user_full_name}! запит схвалено"
+        )
+        
     except Exception as e:
-        print(f"Помилка схвалення запиту на приєднання: {e}")
+        print(f"Помилка схвалення запиту на приєднання або відправки автосмс: {e}")
 
-# --- Обробник Callback Query (Inline кнопки) ---
+# --- Обробник Callback Query (Inline кнопки для правил) ---
 async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer() 
+    await query.answer() # Завжди відповідаємо на query, щоб прибрати "годинник"
 
     if query.data == "show_rules":
+        # Відредагувати повідомлення, щоб показати правила
         rules_text = (
-            "📜 **Правила Чату:**\n"
-            "1\\. Поважайте інших учасників\\.\n"
-            "2\\. Не спамте і не флудьте\\.\n"
-            "3\\. Заборонено образи та дискримінація\\.\n"
-            "4\\. Всі посилання перевіряються системою Safe Browsing\\.\n"
-            "5\\. Дотримуйтесь загальних правил Telegram\\.\n"
+            "ᴋᴏᴘиᴄᴛуйᴄя ᴛᴘигᴇᴘᴏᴍ ᴀʌᴏ"
         )
         try:
-            await query.edit_message_text(text=rules_text, parse_mode=ParseMode.MARKDOWN_V2)
-        except Exception: 
-            # Якщо повідомлення занадто старе, просто відправити нове
-            await query.message.reply_text(rules_text, parse_mode=ParseMode.MARKDOWN_V2)
+             await query.edit_message_text(text=rules_text, parse_mode=ParseMode.MARKDOWN)
+        except Exception:
+             # Якщо повідомлення занадто старе, просто відправити нове
+             await query.message.reply_text(rules_text, parse_mode=ParseMode.MARKDOWN)
 
-# --- Drafts Web App ---
-async def open_drafts_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обробляє команду /drafts, відкриваючи Web App."""
-    if not RENDER_EXTERNAL_URL:
-        await update.message.reply_text("Помилка: RENDER_EXTERNAL_URL не встановлено.")
-        return
+# ----------------------------------------------------
+#               💥 Обробники Діалогу /font 💥
+# ----------------------------------------------------
 
-    webapp_url = f"{RENDER_EXTERNAL_URL.rstrip('/')}/drafts"
-    keyboard = [[InlineKeyboardButton("✏️ Відкрити Чернетки", web_app=WebAppInfo(url=webapp_url))]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+async def font_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Обробляє команду /font, починаючи діалог."""
     
+    # Зберігаємо ID команди та чату для подальшого видалення/взаємодії
+    context.user_data['font_chat_id'] = update.effective_chat.id
+    context.user_data['font_command_id'] = update.message.message_id
+    
+    # Відправляємо запит
+    message = await update.message.reply_text(
+        "ᴋᴀᴛᴀй ᴛᴇᴋᴄᴛ. \n\n"
+        "/cancel дʌя ᴄᴋᴀᴄуʙᴀння."
+    )
+    # Зберігаємо ID повідомлення від бота, щоб потім його видалити
+    context.user_data['font_bot_request_id'] = message.message_id
+
+    return FONT_TEXT
+
+async def font_get_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Обробляє введений користувачем текст, перетворює його та завершує діалог."""
+    
+    user_text = update.message.text
+    chat_id = update.effective_chat.id
+    
+    if not user_text:
+        await update.message.reply_text("Ви нічого не ввели. Будь ласка, введіть текст або /cancel.")
+        return FONT_TEXT # Залишаємося в тому ж стані
+    
+    # 1. Перетворення тексту
+    converted_text = convert_text_to_font(user_text)
+    
+    # 2. Видалення службових повідомлень (для чистоти чату)
+    try:
+        # Видаляємо команду користувача /font
+        await context.bot.delete_message(
+            chat_id=chat_id, 
+            message_id=context.user_data.get('font_command_id')
+        )
+    except Exception as e:
+        print(f"Помилка видалення команди /font: {e}")
+        
+    try:
+        # Видаляємо повідомлення-запит від бота
+        await context.bot.delete_message(
+            chat_id=chat_id, 
+            message_id=context.user_data.get('font_bot_request_id')
+        )
+    except Exception as e:
+        print(f"Помилка видалення запиту бота: {e}")
+
+    try:
+        # Видаляємо повідомлення з введеним текстом від користувача
+        await context.bot.delete_message(
+            chat_id=chat_id, 
+            message_id=update.message.message_id
+        )
+    except Exception as e:
+        print(f"Помилка видалення введеного тексту: {e}")
+        
+    # 3. Надсилаємо результат
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=converted_text,
+        message_thread_id=update.message.message_thread_id # Зберігаємо контекст теми, якщо це група
+    )
+    
+    # 4. Завершуємо діалог
+    return ConversationHandler.END
+
+
+async def font_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Обробляє команду /cancel, завершуючи діалог."""
+    
+    chat_id = context.user_data.get('font_chat_id', update.effective_chat.id)
+    
+    # Спроба видалити повідомлення-запит від бота, якщо воно було надіслано
+    try:
+        await context.bot.delete_message(
+            chat_id=chat_id, 
+            message_id=context.user_data.get('font_bot_request_id')
+        )
+    except Exception:
+        pass # Ігноруємо помилки, якщо повідомлення вже немає
+        
+    # Спроба видалити команду /font
+    try:
+        await context.bot.delete_message(
+            chat_id=chat_id, 
+            message_id=context.user_data.get('font_command_id')
+        )
+    except Exception:
+        pass
+        
+    # Надсилаємо коротке повідомлення про скасування
     await update.message.reply_text(
-        "Натисніть кнопку, щоб відкрити персональну сітку чернеток:",
-        reply_markup=reply_markup,
+        "❌ Діалог скасовано.",
         message_thread_id=update.message.message_thread_id
     )
-
-# --- Job для Нагадувань ---
-async def send_reminder_job(context: ContextTypes.DEFAULT_TYPE):
-    """Надсилає нагадування користувачу."""
-    job = context.job
-    chat_id = job.data.get('chat_id')
-    text = job.data.get('text')
     
-    try:
-        # Екранування тексту для MarkdownV2
-        escaped_text = re.sub(r'([_*\[\]()~`>#+\-=|{}.!])', r'\\\1', text)
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=f"⏰ **НАГАДУВАННЯ:**\\n\\n`{escaped_text}`",
-            parse_mode=ParseMode.MARKDOWN_V2
-        )
-    except Exception as e:
-        print(f"Помилка відправки нагадування {chat_id}: {e}")
-
-# --- Обробка Web App Data ---
-async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обробляє JSON дані, отримані з Web App (drafts.html)."""
-    user_data_string = update.message.web_app_data.data
-    chat_id = update.effective_chat.id
-    user = update.effective_user
-    job_queue = context.application.job_queue
-
-    notes_saved = 0
-    arts_saved = 0
-    reminders_set = 0
-
-    try:
-        data = json.loads(user_data_string)
-
-        # 1. Обробка Нотаток/Нагадувань
-        if 'notes' in data and isinstance(data['notes'], list):
-            for item in data['notes']:
-                text = item.get('text', '').strip()
-                reminder = item.get('reminder') # ISO 8601 UTC string
-                
-                if text:
-                    notes_saved += 1
-                    
-                    # 2. Обробка Нагадувань
-                    if reminder:
-                        try:
-                            reminder_time_utc = datetime.datetime.fromisoformat(reminder.replace('Z', '+00:00'))
-                            if reminder_time_utc > datetime.datetime.now(datetime.timezone.utc):
-                                job_name = f"reminder_user_{user.id}_{uuid4()}"
-                                
-                                job_queue.run_once(
-                                    send_reminder_job,
-                                    reminder_time_utc,
-                                    data={'chat_id': chat_id, 'text': text},
-                                    name=job_name
-                                )
-                                reminders_set += 1
-                        
-                        except (ValueError, TypeError) as e:
-                            print(f"Помилка парсингу часу нагадування: {e}")
-
-        # 3. Обробка Артів
-        if 'arts' in data and isinstance(data['arts'], list):
-            for item in data['arts']:
-                base64_image = item.get('image')
-                if base64_image:
-                    try:
-                        image_data = base64.b64decode(base64_image)
-                        image_stream = io.BytesIO(image_data)
-                        
-                        Image.open(image_stream) 
-                        image_stream.seek(0)
-                        
-                        await context.bot.send_photo(
-                            chat_id=chat_id,
-                            photo=image_stream,
-                            caption="🖼️ Збережений Pixel Art",
-                        )
-                        arts_saved += 1
-                    except Exception as e:
-                        print(f"Помилка обробки або відправки арту: {e}")
-
-        # Відповідь користувачу про успішне збереження
-        await update.message.reply_text(
-            f"✅ Дані з Drafts збережено!\n"
-            f"Нотаток: {notes_saved}\n"
-            f"Артів: {arts_saved}\n"
-            f"Нагадувань встановлено: {reminders_set}",
-        )
-
-    except json.JSONDecodeError:
-        await update.message.reply_text("Помилка обробки даних з Web App.")
-    except Exception as e:
-        print(f"Помилка в handle_webapp_data: {e}")
-        await update.message.reply_text(f"Сталася помилка: {e}")
-
-# --- Обробник команди /font ---
-async def font_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обробляє команду /font, перетворюючи наступний текст або текст у відповіді."""
-    
-    text_to_convert = None
-    reply_to_message_id = None
-    
-    # Сценарій: Текст після команди /font
-    if context.args:
-        text_to_convert = " ".join(context.args)
-        reply_to_message_id = None 
-    
-    # Сценарій: Відповідь на інше повідомлення
-    elif update.message.reply_to_message and update.message.reply_to_message.text:
-        text_to_convert = update.message.reply_to_message.text
-        reply_to_message_id = update.message.reply_to_message.message_id
-        
-    if not text_to_convert:
-        await update.message.reply_text(
-            "Надішліть команду `/font <текст>` або `/font`, відповідаючи на повідомлення, щоб змінити шрифт.",
-            parse_mode='Markdown'
-        )
-        return
-
-    converted_text = convert_text_to_font(text_to_convert)
-
-    await update.message.reply_text(
-        converted_text,
-        reply_to_message_id=reply_to_message_id 
-    )
+    # Завершуємо діалог
+    return ConversationHandler.END

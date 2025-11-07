@@ -1,225 +1,279 @@
-import os
-import re
-import json
-import datetime
-import base64
-import io
-from uuid import uuid4
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
-from telegram.ext import ContextTypes
-from telegram.constants import ChatType, ParseMode
-from PIL import Image
-from dotenv import load_dotenv
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MORSTRIX | Архів (Pixel Art)</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --bg-color: #000000; /* Чорний фон */
+            --grid-color: #004d40; /* Темно-зелений для сітки */
+            --text-color: #00ff00; /* Яскраво-зелений для тексту (Pixel) */
+            --accent-color: #ff00ff; /* Маджента для акценту (Retro) */
+            --cell-size: 80px;
+        }
 
-# Завантажуємо змінні оточення для використання в хендлерах, якщо потрібно
-if os.getenv("RENDER") != "true":
-    load_dotenv()
-
-RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL")
-
-# --- Обробник нових учасників ---
-async def handle_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    for member in update.message.new_chat_members:
-        if not member.is_bot:
-            
-            # Кнопка для правил
-            keyboard = [[InlineKeyboardButton("Показати Правила", callback_data="show_rules")]]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-            welcome_message = (
-                f"Привіт, {member.full_name}! 👋\n"
-                f"Ласкаво просимо до нашої спільноти. \n"
-                f"Будь ласка, ознайомтеся з правилами."
-            )
-            
-            # Перевіряємо, чи це група з темами (форум)
-            thread_id = update.message.message_thread_id if update.message.is_topic_message else None
-
-            await update.message.reply_text(
-                welcome_message,
-                reply_markup=reply_markup,
-                message_thread_id=thread_id
-            )
-
-# --- Обробник запитів на приєднання ---
-async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Приклад: автоматичне прийняття запиту
-    chat_id = update.chat.id
-    user_id = update.from_user.id
-    try:
-        await context.bot.approve_chat_join_request(chat_id=chat_id, user_id=user_id)
-        # Можна відправити привітання
-        # await context.bot.send_message(user_id, "Ваш запит на приєднання до чату схвалено!")
-    except Exception as e:
-        print(f"Помилка схвалення запиту на приєднання: {e}")
-
-# --- Обробник Callback Query (Inline кнопки) ---
-async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer() # Завжди відповідаємо на query, щоб прибрати "годинник"
-
-    if query.data == "show_rules":
-        # Відредагувати повідомлення, щоб показати правила
-        rules_text = (
-            "📜 **Правила Чату:**\n"
-            "1. Поважайте інших учасників.\n"
-            "2. Не спамте і не флудьте.\n"
-            "3. Заборонено образи та дискримінація.\n"
-            "4. Всі посилання перевіряються системою Safe Browsing.\n"
-            "5. Дотримуйтесь загальних правил Telegram.\n"
-        )
-        try:
-             await query.edit_message_text(text=rules_text, parse_mode=ParseMode.MARKDOWN)
-        except Exception:
-             # Якщо повідомлення занадто старе, просто відправити нове
-             await query.message.reply_text(rules_text, parse_mode=ParseMode.MARKDOWN)
-
-# --- Drafts Web App ---
-
-async def open_drafts_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обробляє команду /drafts, відкриваючи Web App."""
-    if not RENDER_EXTERNAL_URL:
-        await update.message.reply_text("Помилка: RENDER_EXTERNAL_URL не встановлено.")
-        return
+        body {
+            font-family: 'Press Start 2P', monospace; /* Ідеальний для піксельарту */
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            touch-action: pan-y; /* Покращення скролу на мобільних */
+            image-rendering: pixelated;
+        }
         
-    # Створюємо URL для Web App
-    webapp_url = f"{RENDER_EXTERNAL_URL.rstrip('/')}/drafts"
-    
-    keyboard = [[InlineKeyboardButton("✏️ Відкрити Чернетки", web_app=WebAppInfo(url=webapp_url))]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+        /* Якщо немає шрифту 'Press Start 2P', використовуємо моноширинний */
+        @supports not (font-family: 'Press Start 2P') {
+             body {
+                font-family: monospace;
+            }
+        }
 
-    await update.message.reply_text(
-        "Натисніть кнопку, щоб відкрити персональну сітку чернеток:",
-        reply_markup=reply_markup,
-        message_thread_id=update.message.message_thread_id
-    )
+        .header {
+            text-align: center;
+            padding: 10px;
+            background-color: var(--grid-color);
+            color: #fff;
+            box-shadow: 0 4px 0 var(--accent-color);
+            margin-bottom: 5px;
+            text-shadow: 2px 2px 0 #000;
+        }
 
-# --- Job для Нагадувань ---
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(var(--cell-size), 1fr));
+            gap: 1px; /* Імітація тонкої сітки */
+            padding: 10px;
+            background-color: var(--grid-color); /* Колір між клітинками */
+        }
 
-async def send_reminder_job(context: ContextTypes.DEFAULT_TYPE):
-    """Надсилає нагадування користувачу."""
-    job = context.job
-    chat_id = job.data.get('chat_id')
-    text = job.data.get('text')
-    
-    # Використовуємо MarkdownV2 для виділення тексту
-    try:
-        # Екранування тексту для MarkdownV2
-        escaped_text = re.sub(r'([_*\[\]()~`>#+\-=|{}.!])', r'\\\1', text)
+        .cell {
+            min-height: var(--cell-size);
+            background-color: var(--bg-color);
+            border: 1px solid var(--grid-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: background-color 0.1s;
+            text-align: center;
+            padding: 5px;
+            font-size: 10px;
+        }
+
+        .cell:hover {
+            background-color: #001a14;
+        }
+
+        .note-indicator {
+            color: var(--accent-color);
+            font-size: 14px;
+            text-shadow: 1px 1px 0 #000;
+            margin-top: 5px;
+        }
+
+        /* Стилі для модального вікна "Кімнати" */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            display: none; /* Приховано за замовчуванням */
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .modal-content {
+            width: 90%;
+            max-width: 500px;
+            background: var(--bg-color);
+            border: 2px solid var(--text-color);
+            padding: 20px;
+            box-shadow: 4px 4px 0 var(--accent-color);
+        }
+
+        textarea {
+            width: 100%;
+            height: 200px;
+            background-color: #000000;
+            color: var(--text-color);
+            border: 1px solid var(--grid-color);
+            padding: 10px;
+            box-sizing: border-box;
+            resize: none;
+            font-family: monospace;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .close-btn, .save-btn {
+            background-color: var(--accent-color);
+            color: var(--bg-color);
+            border: none;
+            padding: 10px 15px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-family: inherit;
+            font-size: 12px;
+            box-shadow: 2px 2px 0 #000;
+        }
         
-        await context.bot.send_message(
-            chat_id=chat_id, 
-            text=f"⏰ **НАГАДУВАННЯ:**\\n\\n`{escaped_text}`", 
-            parse_mode=ParseMode.MARKDOWN_V2
-        )
-    except Exception as e:
-        print(f"Помилка відправки нагадування {chat_id}: {e}")
+        .save-btn {
+            background-color: var(--text-color);
+        }
+    </style>
+    </head>
+<body>
 
-# --- Обробка Web App Data ---
+    <div class="header">
+        MORSTRIX ARCHIVE V1.0
+    </div>
 
-async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обробляє JSON дані, отримані з Web App (drafts.html)."""
-    
-    user_data_string = update.message.web_app_data.data
-    chat_id = update.effective_chat.id
-    user = update.effective_user
-    job_queue = context.application.job_queue # Отримуємо job_queue з context
-    
-    notes_saved = 0
-    arts_saved = 0
-    reminders_set = 0
-    
-    try:
-        data = json.loads(user_data_string)
+    <div id="grid-container" class="grid-container">
+        </div>
+
+    <div id="noteModal" class="modal">
+        <div class="modal-content">
+            <h2 id="modalTitle">Кімната [X, Y]</h2>
+            <textarea id="noteContent" placeholder="Тут ваші нотатки, арти чи повідомлення..."></textarea>
+            <button id="saveNoteBtn" class="save-btn">ЗБЕРЕГТИ</button>
+            <button id="closeModalBtn" class="close-btn">ЗАКРИТИ</button>
+        </div>
+    </div>
+
+    <script>
+        const GRID_SIZE = 5; // Створюємо сітку 5x5
+        const gridContainer = document.getElementById('grid-container');
+        const noteModal = document.getElementById('noteModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const noteContent = document.getElementById('noteContent');
+        const saveNoteBtn = document.getElementById('saveNoteBtn');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+
+        let currentCellKey = null;
+
+        // ----------------------------------------------------
+        // 💾 LOCAL STORAGE ФУНКЦІЇ
+        // ----------------------------------------------------
+
+        /**
+         * Завантажує всі нотатки з Local Storage.
+         * @returns {Object} Об'єкт, де ключ - це ID клітинки (напр., 'cell_2_3'), значення - текст.
+         */
+        function loadNotes() {
+            try {
+                const data = localStorage.getItem('morstrix_drafts');
+                return data ? JSON.parse(data) : {};
+            } catch (e) {
+                console.error("Помилка завантаження LocalStorage:", e);
+                return {};
+            }
+        }
+
+        /**
+         * Зберігає всі нотатки у Local Storage.
+         * @param {Object} notes Об'єкт нотаток для збереження.
+         */
+        function saveNotes(notes) {
+            try {
+                localStorage.setItem('morstrix_drafts', JSON.stringify(notes));
+                if (window.Telegram && window.Telegram.WebApp) {
+                    window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                }
+            } catch (e) {
+                console.error("Помилка збереження LocalStorage:", e);
+                if (window.Telegram && window.Telegram.WebApp) {
+                    window.Telegram.WebApp.HapticFeedback.notificationOccurred('error');
+                }
+            }
+        }
+
+        // ----------------------------------------------------
+        // 🏗️ ГЕНЕРАЦІЯ СІТКИ ТА ЛОГІКА
+        // ----------------------------------------------------
         
-        # 1. Обробка Нотаток/Нагадувань
-        if 'notes' in data and isinstance(data['notes'], list):
-            for item in data['notes']:
-                text = item.get('text', '').strip()
-                reminder = item.get('reminder') # ISO 8601 UTC string
-                
-                if text:
-                    notes_saved += 1
+        const allNotes = loadNotes();
+
+        function generateGrid() {
+            gridContainer.innerHTML = '';
+            for (let row = 1; row <= GRID_SIZE; row++) {
+                for (let col = 1; col <= GRID_SIZE; col++) {
+                    const cellKey = `cell_${row}_${col}`;
+                    const cellDiv = document.createElement('div');
+                    cellDiv.className = 'cell';
+                    cellDiv.dataset.key = cellKey;
                     
-                    # 2. Обробка Нагадувань
-                    if reminder:
-                        try:
-                            # Перетворення ISO UTC на об'єкт datetime
-                            reminder_time_utc = datetime.datetime.fromisoformat(reminder.replace('Z', '+00:00'))
-                            
-                            # Перевіряємо, чи час у майбутньому
-                            if reminder_time_utc > datetime.datetime.now(datetime.timezone.utc):
-                                
-                                # Створюємо унікальне ім'я для завдання
-                                job_name = f"reminder_user_{user.id}_{uuid4()}"
-                                
-                                # Плануємо завдання
-                                job_queue.run_once(
-                                    send_reminder_job,
-                                    reminder_time_utc, # Час у UTC
-                                    data={'chat_id': chat_id, 'text': text},
-                                    name=job_name
-                                )
-                                reminders_set += 1
-                            
-                        except (ValueError, TypeError) as e:
-                            print(f"Помилка парсингу часу нагадування: {e}")
+                    // Перевіряємо, чи є нотатки для цієї клітинки
+                    const hasNote = !!allNotes[cellKey] && allNotes[cellKey].trim() !== '';
 
-        # 3. Обробка Артів
-        if 'arts' in data and isinstance(data['arts'], list):
-            for item in data['arts']:
-                base64_image = item.get('image')
+                    cellDiv.innerHTML = `[${row}, ${col}] ${hasNote ? '<div class="note-indicator">⚡️</div>' : ''}`;
+                    cellDiv.addEventListener('click', () => openCell(cellKey, row, col));
+                    gridContainer.appendChild(cellDiv);
+                }
+            }
+        }
+
+        function openCell(cellKey, row, col) {
+            currentCellKey = cellKey;
+            modalTitle.textContent = `Кімната [${row}, ${col}]`;
+            // Завантажуємо текст для поточної клітинки
+            noteContent.value = allNotes[cellKey] || '';
+            noteModal.style.display = 'flex';
+            if (window.Telegram && window.Telegram.WebApp) {
+                window.Telegram.WebApp.expand(); // Розгортаємо Web App на весь екран
+            }
+        }
+
+        function saveAndClose() {
+            if (currentCellKey) {
+                const content = noteContent.value.trim();
+                if (content === '') {
+                    delete allNotes[currentCellKey]; // Видаляємо, якщо пусто
+                } else {
+                    allNotes[currentCellKey] = content;
+                }
+                saveNotes(allNotes); // Зберігаємо у Local Storage
                 
-                if base64_image:
-                    try:
-                        # Декодуємо Base64
-                        image_data = base64.b64decode(base64_image)
-                        image_stream = io.BytesIO(image_data)
-                        
-                        # Перевірка (опціонально): чи це дійсно зображення
-                        Image.open(image_stream) 
-                        
-                        # Відправляємо як фото
-                        image_stream.seek(0)
-                        await context.bot.send_photo(
-                            chat_id=chat_id,
-                            photo=image_stream,
-                            caption="🖼️ Збережений Pixel Art",
-                        )
-                        arts_saved += 1
-                        
-                    except Exception as e:
-                        print(f"Помилка обробки або відправки арту: {e}")
+                // Оновлюємо відображення клітинки
+                const currentCellDiv = document.querySelector(`.cell[data-key="${currentCellKey}"]`);
+                if (currentCellDiv) {
+                    const hasNote = !!allNotes[currentCellKey];
+                    currentCellDiv.innerHTML = `[${currentCellKey.split('_')[1]}, ${currentCellKey.split('_')[2]}] ${hasNote ? '<div class="note-indicator">⚡️</div>' : ''}`;
+                }
 
+                currentCellKey = null;
+            }
+            noteModal.style.display = 'none';
+        }
 
-        # Відповідь користувачу про успішне збереження
-        await update.message.reply_text(
-            f"✅ Дані з Drafts збережено!\n"
-            f"Нотаток: {notes_saved}\n"
-            f"Артів: {arts_saved}\n"
-            f"Нагадувань встановлено: {reminders_set}",
-            # Примітка: MarkdownV2 тут не потрібен, оскільки ми не екрануємо текст.
-        )
-        
-        # Закриваємо Web App після успішної відправки (опціонально, але корисно)
-        # try:
-        #     await context.bot.answer_web_app_query(
-        #         web_app_query_id=update.message.web_app_data.id, 
-        #         result=InlineQueryResultArticle(
-        #             id=str(uuid4()),
-        #             title="Збережено",
-        #             input_message_content=InputTextMessageContent("Дані успішно синхронізовано з ботом.")
-        #         )
-        #     )
-        # except Exception:
-        #     pass
+        // ----------------------------------------------------
+        // ⚡️ ІНІЦІАЛІЗАЦІЯ
+        // ----------------------------------------------------
 
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.Telegram && window.Telegram.WebApp) {
+                window.Telegram.WebApp.ready();
+            }
+            generateGrid();
+        });
 
-    except json.JSONDecodeError:
-        await update.message.reply_text("Помилка обробки даних з Web App.")
-    except Exception as e:
-        print(f"Помилка в handle_webapp_data: {e}")
-        await update.message.reply_text(f"Сталася помилка: {e}")
+        saveNoteBtn.addEventListener('click', saveAndClose);
+        closeModalBtn.addEventListener('click', () => {
+            noteModal.style.display = 'none';
+            currentCellKey = null;
+        });
 
-# Функції handle_webapp_data та send_reminder_job гарантують, що нагадування прийдуть,
-# а арт буде відправлено як фото, як тільки користувач синхронізує дані.
+        // Додаємо обробник для кнопки "Назад" у Telegram, якщо вона активна
+        if (window.Telegram && window.Telegram.WebApp) {
+            window.Telegram.WebApp.onEvent('backButtonClicked', saveAndClose);
+        }
+    </script>
+</body>
+</html>
