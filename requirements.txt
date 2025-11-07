@@ -4,6 +4,7 @@ langdetect
 requests
 pytz
 python-dotenv
-flask
 Pillow
 aiohttp
+aiodns
+cchardet

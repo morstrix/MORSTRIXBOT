@@ -180,9 +180,10 @@ async def start_webhook_server(application: Application):
     print(f"Запуск aiohttp Webhook Server на порту {PORT}")
     await site.start()
     
-    # Бесконечный цикл, пока bot_app работает
+    # Бесконечный цикл, пока bot_app работает (Утримуємо асинхронний процес активним)
     await application.start()
-    await application.updater.start_polling()
+    # 💥 ФІКС: Замість start_polling() очікуємо на нескінченний Future, щоб тримати процес активним
+    await asyncio.Future() 
 
 # ----------------------------------------------------\
 #                      Запуск
