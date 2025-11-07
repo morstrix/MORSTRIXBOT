@@ -2,202 +2,499 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pixel Art Drafts</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Pixel Grid</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
     <style>
+        :root {
+            --pixel-font: 'Press Start 2P', cursive;
+            --bg-color: #000000;
+            --main-color: #0F0; /* Зелений */
+            --frame-color: #303030; /* Темно-сірий для рамок */
+            --graphite-frame: #505050; /* Графітовий фрейм для арту */
+            --white-color: #FFFFFF;
+            --modal-bg: #111;
+        }
+
         body {
-            font-family: sans-serif;
+            font-family: var(--pixel-font);
+            background-color: var(--bg-color);
+            color: var(--main-color);
             margin: 0;
-            padding: 10px;
-            background-color: var(--tg-theme-bg-color, #f4f4f4);
-            color: var(--tg-theme-text-color, #000);
+            padding: 15px;
             display: flex;
             flex-direction: column;
             align-items: center;
+            overflow: hidden;
+            touch-action: manipulation; /* Запобігання масштабуванню/прокрутці */
         }
 
-        /* Стилізація сітки */
-        #canvas-container {
-            border: 2px solid var(--tg-theme-text-color, #ccc); /* Сірий фрейм */
-            background-color: var(--tg-theme-text-color, #ccc); /* Колір між пікселями */
-            margin: 10px 0;
-            display: inline-block;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        /* --- Шахматна сітка --- */
+        #grid-container {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr); /* 5 колонок */
+            gap: 10px;
+            width: 100%;
+            max-width: 600px;
+            margin-top: 20px;
+        }
+
+        .grid-cell {
+            aspect-ratio: 1 / 1; /* Квадратні клітинки */
+            border: 2px solid var(--frame-color);
+            background-color: var(--modal-bg);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+
+        .grid-cell:hover {
+            border-color: var(--main-color);
+        }
+
+        /* --- Модальні вікна --- */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        .modal-content {
+            background-color: var(--modal-bg);
+            border: 2px solid var(--main-color);
+            padding: 20px;
+            width: 100%;
+            max-width: 400px;
+            box-sizing: border-box;
+            text-align: center;
         }
         
-        /* Холст для піксель-арту */
-        #pixelCanvas {
-            display: block;
-            touch-action: none; /* Відключення скролу на мобільних пристроях під час малювання */
+        .modal-content h3 {
+            margin-top: 0;
+            font-size: 14px;
         }
 
-        /* Стилізація кнопок */
-        .controls {
+        .modal-button {
+            font-family: var(--pixel-font);
+            background-color: var(--main-color);
+            color: var(--bg-color);
+            border: none;
+            padding: 15px;
+            cursor: pointer;
+            font-size: 12px;
+            margin: 5px;
+            display: block;
+            width: 100%;
+        }
+
+        .modal-button.secondary {
+            background-color: var(--frame-color);
+            color: var(--white-color);
+        }
+        
+        .modal-button.delete {
+            background-color: #8B0000; /* Темно-червоний */
+            color: var(--white-color);
+        }
+
+        /* --- Поля вводу --- */
+        input[type="text"],
+        input[type="datetime-local"],
+        textarea {
+            font-family: var(--pixel-font);
+            background-color: var(--bg-color);
+            color: var(--white-color);
+            border: 2px solid var(--frame-color);
+            padding: 10px;
+            width: calc(100% - 24px); /* Врахування padding + border */
+            margin-bottom: 10px;
+            font-size: 10px;
+        }
+        textarea {
+            height: 100px;
+            resize: none;
+        }
+
+        /* --- Редактор Арту --- */
+        #art-editor {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        #canvas-container {
+            border: 5px solid var(--graphite-frame); /* Графітовий фрейм */
+            background-color: var(--white-color);
+            touch-action: none; /* Для малювання пальцем */
+        }
+        
+        .art-tools {
             display: flex;
             gap: 10px;
-            margin-bottom: 20px;
         }
-
-        .controls button {
-            padding: 10px 15px;
-            border: none;
-            border-radius: 8px;
+        
+        .art-tool {
+            font-family: var(--pixel-font);
+            background-color: var(--frame-color);
+            color: var(--white-color);
+            border: 2px solid var(--frame-color);
+            padding: 10px;
             cursor: pointer;
-            background-color: var(--tg-theme-button-color, #50a7e8);
-            color: var(--tg-theme-button-text-color, #fff);
-            font-weight: bold;
+            font-size: 10px;
         }
+        .art-tool.active {
+            border-color: var(--main-color);
+        }
+        
     </style>
 </head>
 <body>
 
-    <p>Квадратик-арт</p>
+    <h3>Pixel Grid 3x5</h3>
+    <div id="grid-container"></div>
 
-    <div class="controls">
-        <button id="tool-white">⚪️ Пензель</button>
-        <button id="tool-eraser">🧼 Гумка</button>
-        <button id="clear-canvas">❌ Очистити</button>
+    <div id="modal-choice" class="modal">
+        <div class="modal-content">
+            <h3>Обрати тип</h3>
+            <button id="btn-choice-note" class="modal-button">📝 Нотатка</button>
+            <button id="btn-choice-art" class="modal-button">🎨 Арт</button>
+            <button id="btn-choice-reminder" class="modal-button">⏰ Нагадування</button>
+            <hr style="border-color: var(--frame-color);">
+            <button id="btn-choice-delete" class="modal-button delete">❌ Видалити</button>
+            <button id="btn-choice-cancel" class="modal-button secondary">Скасувати</button>
+        </div>
     </div>
 
-    <div id="canvas-container">
-        <canvas id="pixelCanvas" width="256" height="256"></canvas>
+    <div id="modal-note" class="modal">
+        <div class="modal-content">
+            <h3>Текстова нотатка</h3>
+            <textarea id="note-text" placeholder="Введіть текст..."></textarea>
+            <button id="btn-note-save" class="modal-button">Зберегти</button>
+            <button id="btn-note-cancel" class="modal-button secondary">Скасувати</button>
+        </div>
+    </div>
+
+    <div id="modal-art" class="modal">
+        <div class="modal-content">
+            <h3>Квадратик-Арт</h3>
+            <div id="art-editor">
+                <div class="art-tools">
+                    <button id="tool-draw-s" class="art-tool active">Маркер (S)</button>
+                    <button id="tool-draw-m" class="art-tool">Маркер (M)</button>
+                    <button id="tool-erase-s" class="art-tool">Гумка (S)</button>
+                    <button id="tool-erase-m" class="art-tool">Гумка (M)</button>
+                </div>
+                <div id="canvas-container">
+                    <canvas id="pixelCanvas" width="256" height="256"></canvas>
+                </div>
+            </div>
+            <button id="btn-art-save" class="modal-button">Зберегти Арт</button>
+            <button id="btn-art-cancel" class="modal-button secondary">Скасувати</button>
+        </div>
     </div>
     
-    <input type="text" id="note-text" placeholder="Опис арту (не обов'язково)" 
-           style="width: 90%; padding: 10px; margin-top: 15px; border-radius: 8px; border: 1px solid #ccc;">
+    <div id="modal-reminder" class="modal">
+        <div class="modal-content">
+            <h3>Пуш-Нагадування</h3>
+            <input type="text" id="reminder-text" placeholder="Текст нагадування...">
+            <input type="datetime-local" id="reminder-time">
+            <button id="btn-reminder-save" class="modal-button">Встановити</button>
+            <button id="btn-reminder-cancel" class="modal-button secondary">Скасувати</button>
+        </div>
+    </div>
 
 
     <script>
-        const GRID_SIZE = 16;
-        const PIXEL_SIZE = 256 / GRID_SIZE;
-        const DEFAULT_COLOR = '#808080'; // Сірий (фрейм)
-        const CANVAS_COLOR = '#f0f0f0'; // Білий фон
-        
-        const canvas = document.getElementById('pixelCanvas');
-        const ctx = canvas.getContext('2d');
-        const toolWhite = document.getElementById('tool-white');
-        const toolEraser = document.getElementById('tool-eraser');
-        const clearCanvasBtn = document.getElementById('clear-canvas');
-        
-        let currentColor = '#ffffff'; // Початковий колір - Білий
+        const tg = window.Telegram.WebApp;
+        tg.expand(); // Розширити Web App на весь екран
 
-        // Ініціалізація полотна (малюємо сіру сітку та білий фон)
-        function initCanvas() {
-            ctx.fillStyle = CANVAS_COLOR;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            drawGrid();
-            // Встановлюємо кнопку "Зберегти" в Telegram WebApp
-            Telegram.WebApp.MainButton.text = "ЗБЕРЕГТИ АРТ";
-            Telegram.WebApp.MainButton.show();
+        const GRID_ROWS = 3;
+        const GRID_COLS = 5;
+        const GRID_TOTAL = GRID_ROWS * GRID_COLS;
+        
+        // --- Стан сітки ---
+        // Це масив, який буде зберігати дані всіх клітинок
+        let gridState = [];
+        
+        // --- Поточна клітинка для редагування ---
+        let currentCellIndex = -1;
+
+        // --- Елементи DOM ---
+        const gridContainer = document.getElementById('grid-container');
+        
+        // Модальні вікна
+        const modalChoice = document.getElementById('modal-choice');
+        const modalNote = document.getElementById('modal-note');
+        const modalArt = document.getElementById('modal-art');
+        const modalReminder = document.getElementById('modal-reminder');
+
+        // --- Ініціалізація ---
+        function initApp() {
+            // Ініціалізуємо стан сітки (15 пустих клітинок)
+            gridState = Array(GRID_TOTAL).fill(null).map(() => ({ type: 'empty' }));
+            
+            // Малюємо сітку
+            renderGrid();
+            
+            // Налаштовуємо головну кнопку Telegram
+            tg.MainButton.text = "ЗБЕРЕГТИ ЗМІНИ";
+            tg.MainButton.color = "#00FF00"; // Зелений
+            tg.MainButton.textColor = "#000000"; // Чорний
+            tg.MainButton.show();
         }
 
-        function drawGrid() {
-            ctx.strokeStyle = DEFAULT_COLOR;
-            ctx.lineWidth = 1;
-            for (let i = 0; i < GRID_SIZE; i++) {
-                // Горизонтальні лінії
-                ctx.beginPath();
-                ctx.moveTo(0, i * PIXEL_SIZE);
-                ctx.lineTo(canvas.width, i * PIXEL_SIZE);
-                ctx.stroke();
-                // Вертикальні лінії
-                ctx.beginPath();
-                ctx.moveTo(i * PIXEL_SIZE, 0);
-                ctx.lineTo(i * PIXEL_SIZE, canvas.height);
-                ctx.stroke();
+        // --- Рендерінг сітки ---
+        function renderGrid() {
+            gridContainer.innerHTML = ''; // Очищуємо контейнер
+            
+            gridState.forEach((cell, index) => {
+                const cellEl = document.createElement('div');
+                cellEl.className = 'grid-cell';
+                
+                // Відображаємо контент залежно від типу
+                switch(cell.type) {
+                    case 'note':
+                        cellEl.innerHTML = '📝';
+                        break;
+                    case 'art':
+                        cellEl.innerHTML = '🎨';
+                        break;
+                    case 'reminder':
+                        cellEl.innerHTML = '⏰';
+                        break;
+                    default: // 'empty'
+                        cellEl.innerHTML = '+';
+                        cellEl.style.color = 'var(--frame-color)';
+                }
+                
+                // Додаємо обробник кліку
+                cellEl.onclick = () => onCellClick(index);
+                
+                gridContainer.appendChild(cellEl);
+            });
+        }
+        
+        // --- Обробка кліку по клітинці ---
+        function onCellClick(index) {
+            currentCellIndex = index;
+            const cellData = gridState[index];
+            
+            // Якщо клітинка не пуста, показуємо модальне вікно вибору (де є кнопка "Видалити")
+            // або одразу вікно редагування
+            if (cellData.type === 'empty') {
+                openChoiceModal();
+            } else {
+                // Якщо клітинка ЗАПОВНЕНА, відкриваємо модалку вибору (з опцією "Видалити")
+                openChoiceModal(true); 
             }
         }
 
-        // Функція для малювання пікселя
-        function drawPixel(e) {
+        // --- Функції Модальних Вікон ---
+        function openChoiceModal(isFilled = false) {
+            document.getElementById('btn-choice-delete').style.display = isFilled ? 'block' : 'none';
+            document.getElementById('btn-choice-note').style.display = isFilled ? 'none' : 'block';
+            document.getElementById('btn-choice-art').style.display = isFilled ? 'none' : 'block';
+            document.getElementById('btn-choice-reminder').style.display = isFilled ? 'none' : 'block';
+            modalChoice.style.display = 'flex';
+        }
+
+        function closeModal(modal) {
+            modal.style.display = 'none';
+            currentCellIndex = -1; // Скидаємо індекс
+        }
+
+        // --- Обробники кнопок вибору ---
+        document.getElementById('btn-choice-note').onclick = () => {
+            modalChoice.style.display = 'none';
+            modalNote.style.display = 'flex';
+            document.getElementById('note-text').value = ''; // Очищуємо
+        };
+        
+        document.getElementById('btn-choice-art').onclick = () => {
+            modalChoice.style.display = 'none';
+            modalArt.style.display = 'flex';
+            initCanvas(); // Ініціалізуємо полотно
+        };
+        
+        document.getElementById('btn-choice-reminder').onclick = () => {
+            modalChoice.style.display = 'none';
+            modalReminder.style.display = 'flex';
+            document.getElementById('reminder-text').value = '';
+            document.getElementById('reminder-time').value = '';
+        };
+
+        document.getElementById('btn-choice-delete').onclick = () => {
+            gridState[currentCellIndex] = { type: 'empty' };
+            renderGrid();
+            closeModal(modalChoice);
+        };
+        
+        document.getElementById('btn-choice-cancel').onclick = () => closeModal(modalChoice);
+        
+        // --- Збереження (Нотатка) ---
+        document.getElementById('btn-note-save').onclick = () => {
+            const text = document.getElementById('note-text').value;
+            gridState[currentCellIndex] = {
+                type: 'note',
+                text: text
+            };
+            renderGrid();
+            closeModal(modalNote);
+        };
+        document.getElementById('btn-note-cancel').onclick = () => closeModal(modalNote);
+
+        // --- Збереження (Нагадування) ---
+        document.getElementById('btn-reminder-save').onclick = () => {
+            const text = document.getElementById('reminder-text').value;
+            const time = document.getElementById('reminder-time').value; // 'YYYY-MM-DDTHH:mm'
+            
+            if (!text || !time) {
+                tg.showAlert('Будь ласка, заповніть текст та час.');
+                return;
+            }
+            
+            // Конвертуємо час в UTC ISO
+            const localDate = new Date(time);
+            const timeUTC = localDate.toISOString();
+
+            gridState[currentCellIndex] = {
+                type: 'reminder',
+                text: text,
+                time: timeUTC // Відправляємо UTC
+            };
+            renderGrid();
+            closeModal(modalReminder);
+        };
+        document.getElementById('btn-reminder-cancel').onclick = () => closeModal(modalReminder);
+        
+        // --- Збереження (Арт) ---
+        document.getElementById('btn-art-save').onclick = () => {
+            const imageData = canvas.toDataURL('image/png'); // Отримуємо base64
+            gridState[currentCellIndex] = {
+                type: 'art',
+                data: imageData // Зберігаємо base64
+            };
+            renderGrid();
+            closeModal(modalArt);
+        };
+        document.getElementById('btn-art-cancel').onclick = () => closeModal(modalArt);
+
+        // ===================================
+        // === ЛОГІКА РЕДАКТОРА ПІКСЕЛЬ-АРТУ ===
+        // ===================================
+        const canvas = document.getElementById('pixelCanvas');
+        const ctx = canvas.getContext('2d');
+        let isDrawing = false;
+        let brushColor = '#FFF'; // Білий маркер
+        let brushSize = 5; // Маленький
+        
+        const tools = {
+            drawS: document.getElementById('tool-draw-s'),
+            drawM: document.getElementById('tool-draw-m'),
+            eraseS: document.getElementById('tool-erase-s'),
+            eraseM: document.getElementById('tool-erase-m'),
+        };
+
+        function initCanvas() {
+            ctx.fillStyle = '#000'; // Чорний фон для малювання
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            setActiveTool('drawS');
+        }
+        
+        function setActiveTool(toolKey) {
+            Object.values(tools).forEach(t => t.classList.remove('active'));
+            tools[toolKey].classList.add('active');
+            
+            if (toolKey === 'drawS') { brushColor = '#FFF'; brushSize = 5; }
+            if (toolKey === 'drawM') { brushColor = '#FFF'; brushSize = 15; }
+            if (toolKey === 'eraseS') { brushColor = '#000'; brushSize = 10; } // Гумка (S)
+            if (toolKey === 'eraseM') { brushColor = '#000'; brushSize = 20; } // Гумка (M)
+        }
+
+        tools.drawS.onclick = () => setActiveTool('drawS');
+        tools.drawM.onclick = () => setActiveTool('drawM');
+        tools.eraseS.onclick = () => setActiveTool('eraseS');
+        tools.eraseM.onclick = () => setActiveTool('eraseM');
+
+        function getMousePos(e) {
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
-
-            const x = (e.clientX - rect.left) * scaleX;
-            const y = (e.clientY - rect.top) * scaleY;
             
-            // Визначаємо координати пікселя
-            const pixelX = Math.floor(x / PIXEL_SIZE);
-            const pixelY = Math.floor(y / PIXEL_SIZE);
+            // Обробка дотиків
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
 
-            // Малюємо квадрат
-            ctx.fillStyle = currentColor;
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            const pos = getMousePos(e);
+            ctx.fillStyle = brushColor;
+            
+            // Малюємо квадрат (піксельний стиль)
             ctx.fillRect(
-                pixelX * PIXEL_SIZE + 1, // +1 для компенсації лінії сітки
-                pixelY * PIXEL_SIZE + 1,
-                PIXEL_SIZE - 2, // -2 для компенсації лінії сітки
-                PIXEL_SIZE - 2
+                pos.x - Math.floor(brushSize / 2), 
+                pos.y - Math.floor(brushSize / 2), 
+                brushSize, 
+                brushSize
             );
+            e.preventDefault();
         }
 
-        // --- Обробники інструментів ---
-        toolWhite.onclick = () => {
-            currentColor = '#ffffff';
-            toolWhite.style.backgroundColor = 'green';
-            toolEraser.style.backgroundColor = '';
-        };
-
-        toolEraser.onclick = () => {
-            currentColor = CANVAS_COLOR; // Колір фону для стирання
-            toolEraser.style.backgroundColor = 'green';
-            toolWhite.style.backgroundColor = '';
-        };
-
-        clearCanvasBtn.onclick = () => {
-            initCanvas();
-        };
-
-        // --- Обробники подій миші/дотику ---
-        let isDrawing = false;
-
-        canvas.addEventListener('mousedown', (e) => {
-            isDrawing = true;
-            drawPixel(e);
-        });
-
-        canvas.addEventListener('mousemove', (e) => {
-            if (isDrawing) {
-                drawPixel(e);
-            }
-        });
-
-        canvas.addEventListener('mouseup', () => {
-            isDrawing = false;
-        });
-
-        canvas.addEventListener('mouseleave', () => {
-            isDrawing = false;
-        });
+        canvas.addEventListener('mousedown', (e) => { isDrawing = true; draw(e); });
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', () => { isDrawing = false; });
+        canvas.addEventListener('mouseleave', () => { isDrawing = false; });
         
-        // --- Обробка натискання кнопки Telegram WebApp ---
-        Telegram.WebApp.onEvent('mainButtonClicked', function(){
-            saveDrawing();
+        // Для мобільних
+        canvas.addEventListener('touchstart', (e) => { isDrawing = true; draw(e); }, { passive: false });
+        canvas.addEventListener('touchmove', draw, { passive: false });
+        canvas.addEventListener('touchend', () => { isDrawing = false; });
+
+        // ===================================
+        // === ВІДПРАВКА ДАНИХ БОТУ ===
+        // ===================================
+        
+        tg.onEvent('mainButtonClicked', function() {
+            // Створюємо об'єкт для відправки
+            const dataToSend = {
+                grid: gridState
+            };
+            
+            // Надсилаємо дані боту
+            tg.sendData(JSON.stringify(dataToSend));
+            
+            // WebApp буде закрито автоматично, якщо бот відповість
+            // Або можна закрити примусово:
+            // tg.close();
         });
 
-        // --- Функція збереження ---
-        function saveDrawing() {
-            // 1. Отримуємо зображення у форматі base64 PNG
-            const imageDataURL = canvas.toDataURL('image/png'); 
-            const noteText = document.getElementById('note-text').value;
-
-            // 2. Створюємо об'єкт для надсилання боту
-            const dataToSend = JSON.stringify({
-                type: 'pixel_art', 
-                data: imageDataURL, 
-                note: noteText 
-            });
-
-            // 3. Надсилаємо дані боту
-            Telegram.WebApp.sendData(dataToSend);
-            
-            // WebApp буде закрито після отримання відповіді від бота
-        }
-
-        // Запуск
-        Telegram.WebApp.ready();
-        initCanvas();
+        // --- Запуск ---
+        tg.ready();
+        initApp();
 
     </script>
 </body>
