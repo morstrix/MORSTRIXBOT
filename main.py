@@ -7,7 +7,6 @@ from telegram.ext import (
     ChatJoinRequestHandler, CallbackQueryHandler, JobQueue,
     ConversationHandler 
 )
-# ✅ ДОДАНО InlineKeyboardButton, InlineKeyboardMarkup для команди /drafts
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup 
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
@@ -19,7 +18,7 @@ from ai import handle_gemini_message_group, handle_gemini_message_private
 from handlers import (
     handle_new_members, handle_join_request, handle_callback_query,
     font_start, font_get_text, font_cancel,
-    handle_web_app_data, # ✅ ІМПОРТУЄМО обробник Web App
+    handle_web_app_data, # ✅ ОБРАБОТЧИК ДАННЫХ WEB APP
 )
 from safe import check_links 
 
@@ -27,6 +26,7 @@ from safe import check_links
 # 🛡️ КОНФИГУРАЦИЯ
 # ----------------------------------------------------
 
+# Завантажуємо змінні оточення
 if os.getenv("RENDER") != "true":
     load_dotenv()
 
@@ -43,7 +43,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "ᴡᴇʟᴄᴏᴍᴇ \n\n"
         "фунᴋціᴏнᴀʌ:\n"
         "➞ /font - ᴛᴇᴋᴄᴛ ᴄᴛᴀйʌᴇᴘ \n"
-        "➞ /drafts - ʜᴏᴛᴇ/ᴀʀᴛ/ᴘᴜꜱʜ \n" # ✅ Оновлено опис
+        "➞ /drafts - ʜᴏᴛᴇ/ᴀʀᴛ/ᴘᴜꜱʜ \n"
         "➞ ᴀʙᴛᴏпᴘийᴏᴍ зᴀяʙᴏᴋ\n"
         "➞ пᴇᴘᴇʙіᴘᴋᴀ пᴏᴄиʌᴀнь\n\n"
         "➞ ШІ — дʌя чʌᴇніʙ ᴋʌубу.\n"
@@ -51,11 +51,11 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode=ParseMode.MARKDOWN
     )
 
-# Инициализация объекта application
+# Инициализация объекта application и JobQueue
 job_queue = JobQueue()
 application = Application.builder().token(TELEGRAM_BOT_TOKEN).job_queue(job_queue).build()
 
-# 🆕 СТАНИ ДЛЯ FONT_HANDLER
+# 💥 СТАНИ ДЛЯ FONT_HANDLER 💥
 FONT_START, FONT_GET_TEXT = range(2)
 
 # ----------------------------------------------------
@@ -79,11 +79,15 @@ async def drafts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-# Регистрация Обработчиков
-application.add_handler(CommandHandler("start", start_command))
-application.add_handler(CommandHandler("drafts", drafts_command)) # ✅ ДОДАНО: Обробник команди /drafts
+# ====================================================
+#              РЕЄСТРАЦІЯ ОБРОБНИКІВ
+# ====================================================
 
-# 💥 FONT CONVERSATION HANDLER 💥
+# Основні команди
+application.add_handler(CommandHandler("start", start_command))
+application.add_handler(CommandHandler("drafts", drafts_command)) 
+
+# FONT CONVERSATION HANDLER
 font_conv_handler = ConversationHandler(
     entry_points=[CommandHandler("font", font_start)],
     states={
@@ -93,25 +97,25 @@ font_conv_handler = ConversationHandler(
     fallbacks=[CommandHandler("cancel", font_cancel)],
     allow_reentry=True
 )
-
 application.add_handler(font_conv_handler)
 
 
+# Обробники подій
 application.add_handler(CallbackQueryHandler(handle_callback_query)) 
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members))
 application.add_handler(ChatJoinRequestHandler(handle_join_request))
 
-# ✅ ДОДАНО: Обробник для даних, що надходять від Web App
+# ✅ Обробник для даних, що надходять від Web App
 application.add_handler(MessageHandler(filters.UpdateType.WEB_APP_DATA, handle_web_app_data)) 
 
-# Обработчики Gemini (ІІ з перевіркою)
+# Обробники Gemini (ІІ)
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_gemini_message_private))
 application.add_handler(MessageHandler(
     filters.TEXT & ~filters.COMMAND & filters.Regex(r'(?i)ало') & filters.ChatType.GROUPS,
     handle_gemini_message_group
 ))
 
-# ✅ Обробник для перевірки посилань (автоматичний)
+# Обробник для перевірки посилань
 link_filters = filters.Entity("url") | filters.Entity("text_link")
 application.add_handler(MessageHandler(link_filters & filters.ChatType.GROUPS, check_links))
 
@@ -123,14 +127,11 @@ application.add_handler(MessageHandler(link_filters & filters.ChatType.GROUPS, c
 async def start_webhook_server(application: Application):
     """Настраивает и запускает aiohttp сервер для Webhook."""
     
-    # 1. Настройка aiohttp
     app = web.Application()
     
-    # ✅ ДОДАНО: Обробник для статичного файлу drafts.html
-    # Припускаємо, що drafts.html лежить у корені (./) і доступний через /drafts.html
+    # Обробник для статичного файлу drafts.html
     app.router.add_static('/', path='./', name='static_files', follow_symlinks=True) 
 
-    # 2. Добавляем Webhook Telegram
     webhook_path = f'/{TELEGRAM_BOT_TOKEN}'
     
     async def handle_telegram_webhook(request):
@@ -152,15 +153,12 @@ async def start_webhook_server(application: Application):
 
     app.router.add_post(webhook_path, handle_telegram_webhook)
 
-    # 3. Добавляем простой health check
     async def handle_health_check(request):
         return web.Response(text="Bot is running!", status=200)
     app.router.add_get('/', handle_health_check)
     
-    # Добавляем объект Application и Bot в контекст aiohttp
     app['bot_app'] = application
     
-    # 4. Установка Webhook
     if RENDER_EXTERNAL_URL:
         base_url = RENDER_EXTERNAL_URL.rstrip('/')
         full_webhook_url = f"{base_url}{webhook_path}"
@@ -173,14 +171,12 @@ async def start_webhook_server(application: Application):
         )
         print("Вебхук успешно установлен.")
     
-    # 5. Запуск сервера
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', PORT)
     print(f"Запуск aiohttp Webhook Server на порту {PORT}")
     await site.start()
     
-    # Бесконечный цикл, пока bot_app работает
     await application.start()
     await application.updater.start_polling()
 
@@ -191,8 +187,8 @@ async def start_webhook_server(application: Application):
 def main():
     if os.getenv("RENDER") == "true":
         print("Запуск в режиме Webhook (Render)...")
-        # Запускаем асинхронный сервер
-        application.job_queue.start() # ✅ ЗАПУСКАЄМО JobQueue
+        # ✅ ЗАПУСКАЄМО JobQueue для нагадувань
+        application.job_queue.start() 
         asyncio.run(start_webhook_server(application))
     else:
         print("Запуск бота в режиме опроса (Polling).")
