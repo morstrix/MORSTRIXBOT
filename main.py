@@ -1,8 +1,8 @@
-# main.py (ПОВНИЙ КОД З FLASK)
+# main.py (ПОВНИЙ КОД З ВИПРАВЛЕННЯМ RuntimeError)
 
 import os
 import json
-import asyncio # <--- НОВИЙ ІМПОРТ
+import asyncio
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
     ChatJoinRequestHandler, CallbackQueryHandler, ConversationHandler, JobQueue
@@ -16,7 +16,7 @@ from flask import Flask, request, render_template
 from ai import handle_gemini_message_group, handle_gemini_message_private
 from handlers import (
     handle_new_members, handle_join_request, handle_callback_query,
-    open_drafts_webapp, handle_webapp_data # handle_webapp_data - нова функція
+    open_drafts_webapp, handle_webapp_data
 )
 from safe import check_links 
 from weather import weather_command
@@ -33,61 +33,60 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL")
 PORT = int(os.environ.get("PORT", 8080))
 # Встановлюємо Flask-додаток
-app = Flask(__name__, template_folder='.') # Змінено 'templates' на '.'
-
-# ----------------------------------------------------
-# 🤖 НАЛАШТУВАННЯ БОТА
-# ----------------------------------------------------
+app = Flask(__name__, template_folder='.') 
 
 # Ініціалізація Application
 application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 job_queue: JobQueue = application.job_queue
 
-# --- Хендлери ---
+# --- Хендлери (Винесено в функцію для коректної ініціалізації bot.username) ---
 
-# 1. Початок роботи /drafts (Web App)
-application.add_handler(CommandHandler("drafts", open_drafts_webapp, filters=filters.ChatType.PRIVATE))
-# 2. Обробка даних з Web App
-application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
+def add_handlers(application: Application):
+    """Додає всі хендлери до Application."""
+    
+    # 1. Початок роботи /drafts (Web App)
+    application.add_handler(CommandHandler("drafts", open_drafts_webapp, filters=filters.ChatType.PRIVATE))
+    # 2. Обробка даних з Web App
+    application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
 
-# 3. Обробка команди /weather
-application.add_handler(CommandHandler("weather", weather_command))
+    # 3. Обробка команди /weather
+    application.add_handler(CommandHandler("weather", weather_command))
 
-# 4. Обробка команди /translate
-translate_handler = ConversationHandler(
-    entry_points=[CommandHandler("translate", translate_text_command)],
-    states={
-        TRANSLATE_STATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_translation_text)],
-    },
-    fallbacks=[CommandHandler("cancel", lambda u, c: ConversationHandler.END)] # Додайте команду скасування, якщо потрібно
-)
-application.add_handler(translate_handler)
+    # 4. Обробка команди /translate
+    translate_handler = ConversationHandler(
+        entry_points=[CommandHandler("translate", translate_text_command)],
+        states={
+            TRANSLATE_STATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_translation_text)],
+        },
+        fallbacks=[CommandHandler("cancel", lambda u, c: ConversationHandler.END)]
+    )
+    application.add_handler(translate_handler)
 
-# 5. Обробка нових учасників
-application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members))
+    # 5. Обробка нових учасників
+    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members))
 
-# 6. Обробка запитів на приєднання
-application.add_handler(ChatJoinRequestHandler(handle_join_request))
+    # 6. Обробка запитів на приєднання
+    application.add_handler(ChatJoinRequestHandler(handle_join_request))
 
-# 7. Обробка натискань Inline кнопок (CallbackQueryHandler)
-application.add_handler(CallbackQueryHandler(handle_callback_query))
+    # 7. Обробка натискань Inline кнопок (CallbackQueryHandler)
+    application.add_handler(CallbackQueryHandler(handle_callback_query))
 
-# 8. Обробка повідомлень з посиланнями (Safe Browsing) - тільки в групах
-application.add_handler(MessageHandler(
-    filters.ChatType.GROUPS & (filters.Entity("url") | filters.Entity("text_link")), 
-    check_links
-))
+    # 8. Обробка повідомлень з посиланнями (Safe Browsing) - тільки в групах
+    application.add_handler(MessageHandler(
+        filters.ChatType.GROUPS & (filters.Entity("url") | filters.Entity("text_link")), 
+        check_links
+    ))
 
-# 9. Обробка повідомлень для Gemini (групові чати)
-# Фільтр: повідомлення, що містять "ало" або згадку бота
-gemini_group_filter = filters.ChatType.GROUPS & filters.TEXT & (
-    filters.Regex(r'(?i)\bало\b') | 
-    filters.Mention(application.bot.username)
-)
-application.add_handler(MessageHandler(gemini_group_filter, handle_gemini_message_group))
+    # 9. Обробка повідомлень для Gemini (групові чати)
+    # application.bot.username тепер буде доступний, оскільки функція викликається після application.initialize()
+    gemini_group_filter = filters.ChatType.GROUPS & filters.TEXT & (
+        filters.Regex(r'(?i)\bало\b') | 
+        filters.Mention(application.bot.username)
+    )
+    application.add_handler(MessageHandler(gemini_group_filter, handle_gemini_message_group))
 
-# 10. Обробка повідомлень для Gemini (приватні чати)
-application.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, handle_gemini_message_private))
+    # 10. Обробка повідомлень для Gemini (приватні чати)
+    application.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, handle_gemini_message_private))
 
 
 # ----------------------------------------------------
@@ -135,11 +134,12 @@ def main():
     if os.getenv("RENDER") == "true":
         print("Запуск в режимі Webhook (Render)...")
         
+        # Ініціалізуємо Application для доступу до bot.username
+        application.initialize() 
+        add_handlers(application) # ДОДАЄМО ХЕНДЛЕРИ ПІСЛЯ ІНІЦІАЛІЗАЦІЇ
+        
         # Налаштовуємо та запускаємо вебхук асинхронно
         try:
-            # ВИПРАВЛЕНО: Використовуємо asyncio.run() для запуску асинхронної setup_webhook
-            # Також Application.initialize() викликаємо тут, щоб ініціалізувати JobQueue
-            application.initialize()
             asyncio.run(setup_webhook())
         except Exception as e:
             print(f"Помилка під час асинхронного запуску setup_webhook: {e}")
@@ -150,6 +150,8 @@ def main():
 
     else:
         print("Запуск бота в режимі опитування...")
+        # Для режиму опитування також додаємо хендлери
+        add_handlers(application)
         application.run_polling(poll_interval=3)
 
 if __name__ == "__main__":
