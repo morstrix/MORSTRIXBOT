@@ -1,4 +1,3 @@
-drafts.html
 <!DOCTYPE html>
 <html lang="uk">
 <head>
@@ -6,21 +5,18 @@ drafts.html
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>MORSTRIX | DRAFTZ</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="drafts.js" defer></script>
     <style>
-        /* --- РЕТРО СТИЛЬ --- */
         :root {
             --bg-color: #000000;
-            --main-green: #00ff00; /* Яркий текст */
-            --dark-green: #008000; /* Темный акцент */
-            --red-exit: #ff0000;
-            --grid-color: #111111;
-            --canvas-bg: #222222; /* Темно-серый холст */
-            --cell-size: 15px;
+            --main-green: #00ff00;
+            --dark-green: #008000;
+            --canvas-bg: #222222;
             --input-bg: #0d0d0d;
         }
 
         body {
-            font-family: monospace; /* Ретро-шрифт (замените на Press Start 2P, если он есть) */
+            font-family: monospace;
             background-color: var(--bg-color);
             color: var(--main-green);
             margin: 0;
@@ -28,14 +24,6 @@ drafts.html
             overflow-x: hidden;
             touch-action: pan-y;
             image-rendering: pixelated;
-        }
-
-        /* --- Кнопки и Управление --- */
-        .header-title {
-            text-align: center;
-            font-size: 20px;
-            padding-bottom: 15px;
-            text-shadow: 0 0 5px var(--main-green);
         }
 
         .action-button, .item-button {
@@ -61,33 +49,19 @@ drafts.html
             float: right;
             color: var(--main-green);
         }
-        
         .item-button:hover span {
             color: var(--bg-color);
         }
 
-        /* --- Контейнеры Вьюшек --- */
         .view {
             display: none;
-            padding-bottom: 50px; /* Отступ для MainButton */
+            padding-top: 25px;
+            padding-bottom: 50px;
         }
         .view.active {
             display: block;
         }
 
-        /* --- Кнопка Выхода (Имитация крестика) --- */
-        #exit-btn {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            color: var(--red-exit);
-            font-size: 24px;
-            cursor: pointer;
-            z-index: 1000;
-            text-shadow: 0 0 5px var(--red-exit);
-        }
-
-        /* --- Поля Ввода --- */
         input[type="text"], input[type="datetime-local"], textarea {
             width: 95%;
             padding: 10px;
@@ -98,11 +72,10 @@ drafts.html
             margin-bottom: 10px;
             resize: none;
         }
-        
-        /* --- Pixel Art Editor --- */
+
         #art-canvas-container {
             width: 100%;
-            max-width: 450px; /* Ограничение для больших экранов */
+            max-width: 450px;
             margin: 0 auto 10px;
             background-color: var(--canvas-bg);
             border: 2px solid var(--main-green);
@@ -135,56 +108,50 @@ drafts.html
             width: 30px;
             cursor: pointer;
         }
-
     </style>
 </head>
 <body>
 
-    <div id="exit-btn" onclick="goBackOrClose()">❌</div>
-
     <div id="catalog-list-view" class="view active">
-        <div class="header-title">DRAFTZ / CATALOGS</div>
-        <div id="catalogs-container">
-            </div>
+        <div id="catalogs-container"></div>
         <button class="action-button" onclick="showCatalogCreator()">+ СТВОРИТИ КАТАЛОГ</button>
     </div>
 
     <div id="item-list-view" class="view">
-        <div class="header-title" id="item-list-title"></div>
-        <div id="items-container">
-            </div>
+        <div id="items-container"></div>
         <button class="action-button" onclick="showItemCreator()">+ СТВОРИТИ ЕЛЕМЕНТ</button>
     </div>
     
     <div id="catalog-editor-view" class="view">
-        <div class="header-title">КАТАЛОГ / СТВОРЕННЯ</div>
         <input type="text" id="catalog-name-input" placeholder="Назва Каталогу">
+        <button class="action-button" onclick="createCatalog()">СТВОРИТИ</button>
+        <button class="action-button" onclick="showCatalogList()">СКАСУВАТИ</button>
     </div>
 
     <div id="item-creator-view" class="view">
-        <div class="header-title">ОБЕРИ ТИП ЕЛЕМЕНТА</div>
-        <button class="action-button" onclick="showNoteEditor()">📝 НОВА ЗАМІТКА</button>
-        <button class="action-button" onclick="showPushEditor()">⏰ НОВЕ НАГАДУВАННЯ</button>
-        <button class="action-button" onclick="showArtEditor()">🎨 НОВИЙ АРТ</button>
+        <button class="action-button" onclick="showNoteEditor()">НОВА ЗАМІТКА</button>
+        <button class="action-button" onclick="showPushEditor()">НОВЕ НАГАДУВАННЯ</button>
+        <button class="action-button" onclick="showArtEditor()">НОВИЙ АРТ</button>
+        <button class="action-button" onclick="showItemList()">НАЗАД</button>
     </div>
 
-
     <div id="note-editor-view" class="view">
-        <div class="header-title">ЗАМІТКА / РЕДАКТОР</div>
         <input type="text" id="note-name-input" placeholder="Назва Замітки">
         <textarea id="note-text-input" rows="10" placeholder="Текст замітки..."></textarea>
+        <button class="action-button" onclick="saveNote()">ЗБЕРЕГТИ</button>
+        <button class="action-button" onclick="showItemList()">НАЗАД</button>
     </div>
 
     <div id="push-editor-view" class="view">
-        <div class="header-title">НАГАДУВАННЯ / НАЛАШТУВАННЯ</div>
         <input type="text" id="push-name-input" placeholder="Назва Нагадування">
         <p>Дата і Час (Ваш локальний час):</p>
         <input type="datetime-local" id="push-datetime-input">
         <textarea id="push-text-input" rows="4" placeholder="Текст нагадування..."></textarea>
+        <button class="action-button" onclick="savePush()">ЗАПЛАНУВАТИ</button>
+        <button class="action-button" onclick="showItemList()">НАЗАД</button>
     </div>
 
     <div id="art-editor-view" class="view">
-        <div class="header-title">ПІКСЕЛЬНИЙ АРТ / РЕДАКТОР</div>
         <input type="text" id="art-name-input" placeholder="Назва Арту">
         
         <div id="art-canvas-container">
@@ -193,502 +160,12 @@ drafts.html
 
         <div class="art-controls">
             <input type="color" id="color-picker" value="#ffffff" title="Колір">
-            <button id="toggle-tool-btn" data-tool="pen">✏️ Кисть</button>
-            <button id="clear-art-btn">🗑️ Очистити</button>
-            <button id="send-art-btn">📨 НАДІСЛАТИ</button>
+            <button id="toggle-tool-btn" onclick="toggleTool()">Кисть</button>
+            <button id="clear-art-btn" onclick="if(confirm('Очистити?')) { initPixelGrid(); redrawCanvas(); saveArt(currentItemId); }">Очистити</button>
+            <button id="send-art-btn" onclick="sendArt()">Відправити</button>
+            <button class="action-button" onclick="showItemList()">НАЗАД</button>
         </div>
     </div>
 
-
-    <script>
-        // --- КОНСТАНТИ ---
-        const WebApp = window.Telegram.WebApp;
-        const GRID_DIMENSION = 20; 
-        const CELL_SIZE = 15; 
-        const CANVAS_WIDTH = GRID_DIMENSION * CELL_SIZE;
-        const CANVAS_HEIGHT = GRID_DIMENSION * CELL_SIZE;
-        
-        // --- СТАН ДОДАТКУ ---
-        let currentView = 'catalog-list-view';
-        let viewHistory = [];
-        let dataStore = JSON.parse(localStorage.getItem('draftsData') || '{"catalogs": {}}');
-        let currentCatalogId = null;
-        let currentItemId = null;
-        let currentItemType = null; // 'note', 'push', 'art'
-        
-        // --- PIXEL ART СТАН ---
-        let canvas, ctx, colorPicker, toggleToolBtn, clearArtBtn, sendArtBtn;
-        let pixelGrid;
-        let isDrawing = false;
-        let currentDrawColor = '#ffffff';
-        let currentTool = 'pen'; 
-        
-        // --- ІНІЦІАЛІЗАЦІЯ ---
-
-        function initApp() {
-            if (WebApp) {
-                WebApp.ready();
-                WebApp.setHeaderColor(WebApp.themeParams.bg_color);
-                WebApp.onEvent('backButtonClicked', goBackOrClose);
-            }
-            
-            // Art-специфічна ініціалізація, яка залежить від DOM
-            initArtEditor();
-            
-            // Встановлюємо дату за замовчуванням
-            const now = new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60000));
-            document.getElementById('push-datetime-input').min = now.toISOString().slice(0, 16);
-            
-            showView('catalog-list-view');
-            
-            // Налаштування MainButton
-            WebApp.MainButton.setText("ENTER [СОХРАНИТЬ]");
-            WebApp.MainButton.onClick(handleMainButtonClick);
-            WebApp.MainButton.hide();
-
-            // 💥 ФИКС 1: ОБРАБОТКА КЛАВИШИ ENTER ДЛЯ СОЗДАНИЯ КАТАЛОГА 💥
-            const catalogInput = document.getElementById('catalog-name-input');
-            if (catalogInput) {
-                catalogInput.addEventListener('keydown', function(event) {
-                    if (event.key === 'Enter' || event.keyCode === 13) {
-                        event.preventDefault(); 
-                        saveCatalog(); // Вызываем функцию сохранения каталога
-                    }
-                });
-            }
-             
-            // 💥 ФИКС 2: Инициализация sendArtBtn (для избежания ошибки ReferenceError) 💥
-            sendArtBtn = document.getElementById('send-art-btn');
-            if (sendArtBtn) {
-                 sendArtBtn.addEventListener('click', sendArt);
-            }
-        }
-
-        function saveStore() {
-            localStorage.setItem('draftsData', JSON.stringify(dataStore));
-        }
-
-        // --- ЛОГІКА НАВІГАЦІЇ ---
-
-        function updateMainButton(isVisible, text = "ENTER [СОХРАНИТЬ]", color = WebApp.themeParams.button_color) {
-            if (!WebApp) return;
-            WebApp.MainButton.setText(text);
-            WebApp.MainButton.setParams({color: color});
-            isVisible ? WebApp.MainButton.show() : WebApp.MainButton.hide();
-        }
-
-        function updateBackButton(isVisible) {
-             if (!WebApp) return;
-             isVisible ? WebApp.BackButton.show() : WebApp.BackButton.hide();
-        }
-
-        function showView(viewId, isNewContext = true) {
-            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-            document.getElementById(viewId).classList.add('active');
-
-            if (isNewContext && viewId !== currentView) {
-                viewHistory.push(currentView);
-            }
-            currentView = viewId;
-            
-            // Налаштування кнопок для кожного view
-            let buttonVisible = false;
-            let backVisible = true;
-            
-            if (viewId === 'catalog-list-view') {
-                 backVisible = false;
-                 updateCatalogList();
-            } else if (viewId.includes('editor-view')) {
-                 buttonVisible = true;
-            } else if (viewId === 'item-list-view') {
-                 updateItemList();
-            }
-            
-            updateMainButton(buttonVisible);
-            updateBackButton(backVisible);
-            
-            // Додаткова логіка для редакторів
-            if (viewId === 'art-editor-view') {
-                loadArt(currentItemId);
-                redrawCanvas();
-            } else if (viewId === 'push-editor-view') {
-                 // Встановлюємо час при відкритті, якщо це новий елемент
-                 const pushDateTime = document.getElementById('push-datetime-input');
-                 if (!currentItemId) {
-                    pushDateTime.value = pushDateTime.min;
-                 }
-            }
-        }
-        
-        function goBackOrClose() {
-            if (viewHistory.length > 0) {
-                const prevView = viewHistory.pop();
-                showView(prevView, false); // false - щоб не додавати в історію
-            } else {
-                if (WebApp) {
-                    WebApp.close();
-                } else {
-                    alert("Закриття Web App (в режимі налагодження)");
-                }
-            }
-        }
-        
-        // --- ЛОГІКА СПИСКІВ (КАТАЛОГИ/ЕЛЕМЕНТИ) ---
-        
-        function generateUniqueId() {
-            return Date.now().toString(36) + Math.random().toString(36).substr(2);
-        }
-
-        function updateCatalogList() {
-            const container = document.getElementById('catalogs-container');
-            container.innerHTML = '';
-            
-            Object.entries(dataStore.catalogs).forEach(([id, catalog]) => {
-                const btn = document.createElement('button');
-                btn.className = 'item-button';
-                btn.innerHTML = `${catalog.name} <span>${Object.keys(catalog.items).length}</span>`;
-                btn.onclick = () => openCatalog(id);
-                container.appendChild(btn);
-            });
-        }
-        
-        function updateItemList() {
-            if (!currentCatalogId) return goBackOrClose();
-
-            const catalog = dataStore.catalogs[currentCatalogId];
-            document.getElementById('item-list-title').textContent = `DRAFTZ / ${catalog.name.toUpperCase()}`;
-            const container = document.getElementById('items-container');
-            container.innerHTML = '';
-
-            Object.entries(catalog.items).forEach(([itemId, item]) => {
-                const btn = document.createElement('button');
-                btn.className = 'item-button';
-                let typeIcon = '';
-                if (item.type === 'note') typeIcon = '📝';
-                if (item.type === 'push') typeIcon = '⏰';
-                if (item.type === 'art') typeIcon = '🎨';
-                
-                btn.innerHTML = `${typeIcon} ${item.name} <span>EDIT</span>`;
-                btn.onclick = () => openItem(itemId, item.type);
-                container.appendChild(btn);
-            });
-        }
-        
-        function openCatalog(id) {
-            currentCatalogId = id;
-            currentItemId = null;
-            currentItemType = null;
-            showView('item-list-view');
-        }
-
-        function openItem(id, type) {
-            currentItemId = id;
-            currentItemType = type;
-            const item = dataStore.catalogs[currentCatalogId].items[id];
-            
-            // Завантаження даних в редактори
-            if (type === 'note') {
-                document.getElementById('note-name-input').value = item.name;
-                document.getElementById('note-text-input').value = item.text || '';
-                showView('note-editor-view');
-            } else if (type === 'push') {
-                document.getElementById('push-name-input').value = item.name;
-                document.getElementById('push-datetime-input').value = item.datetime || '';
-                document.getElementById('push-text-input').value = item.text || '';
-                showView('push-editor-view');
-            } else if (type === 'art') {
-                document.getElementById('art-name-input').value = item.name;
-                showView('art-editor-view');
-            }
-        }
-
-        // --- ЛОГІКА СТВОРЕННЯ ---
-        
-        function showCatalogCreator() {
-            currentItemId = null; 
-            document.getElementById('catalog-name-input').value = '';
-            showView('catalog-editor-view');
-        }
-
-        function showItemCreator() {
-            currentItemId = null; 
-            currentItemType = null;
-            showView('item-creator-view');
-        }
-
-        function showNoteEditor() {
-            currentItemType = 'note';
-            showView('note-editor-view');
-        }
-        
-        function showPushEditor() {
-            currentItemType = 'push';
-            showView('push-editor-view');
-        }
-
-        function showArtEditor() {
-            currentItemType = 'art';
-            // Якщо це новий арт, скидаємо назву і сітку
-            if (!currentItemId) {
-                document.getElementById('art-name-input').value = 'Новий Арт';
-                initPixelGrid(); 
-            }
-            showView('art-editor-view');
-        }
-
-        // --- ЛОГІКА ЗБЕРЕЖЕННЯ (MainButton Click) ---
-
-        function handleMainButtonClick() {
-            if (currentView === 'catalog-editor-view') {
-                saveCatalog();
-            } else if (currentView === 'note-editor-view') {
-                saveNote();
-            } else if (currentView === 'push-editor-view') {
-                savePush();
-            } else if (currentView === 'art-editor-view') {
-                saveArtItem();
-            }
-        }
-
-        function saveCatalog() {
-            const name = document.getElementById('catalog-name-input').value.trim() || "Новий Каталог";
-            const id = currentItemId || generateUniqueId();
-            
-            if (!dataStore.catalogs[id]) {
-                dataStore.catalogs[id] = {id: id, name: name, items: {}};
-            } else {
-                dataStore.catalogs[id].name = name;
-            }
-            saveStore();
-            showView('catalog-list-view');
-        }
-        
-        function saveItem(type) {
-            const id = currentItemId || generateUniqueId();
-            const catalog = dataStore.catalogs[currentCatalogId];
-            
-            let name, data;
-            
-            if (type === 'note') {
-                name = document.getElementById('note-name-input').value.trim() || "Нова Замітка";
-                data = {
-                    text: document.getElementById('note-text-input').value,
-                };
-            } else if (type === 'push') {
-                name = document.getElementById('push-name-input').value.trim() || "Нагадування";
-                data = {
-                    datetime: document.getElementById('push-datetime-input').value,
-                    text: document.getElementById('push-text-input').value,
-                };
-            } else if (type === 'art') {
-                name = document.getElementById('art-name-input').value.trim() || "Піксельний Арт";
-                // Art data is already saved in pixelGrid/localStorage
-                data = {}; 
-            }
-            
-            catalog.items[id] = {
-                id: id,
-                type: type,
-                name: name,
-                ...data
-            };
-            saveStore();
-            currentItemId = id; // Встановлюємо ID, щоб можна було відправити
-        }
-
-        function saveNote() {
-            saveItem('note');
-            showView('item-list-view');
-        }
-        
-        function savePush() {
-            saveItem('push');
-            showView('item-list-view');
-        }
-
-        function saveArtItem() {
-            saveItem('art');
-            showView('item-list-view');
-        }
-        
-        // --- ЛОГІКА ВІДПРАВКИ (Тільки для Арту/Пуша) ---
-        
-        // sendArtBtn.addEventListener('click', sendArt); // ❌ ПОМИЛКА: sendArtBtn не ініціалізовано тут
-
-        function sendArt() {
-            // Зберігаємо останній стан
-            saveArtItem(); 
-            
-            if (!currentItemId) return alert("Спочатку збережіть арт.");
-
-            const artData = localStorage.getItem(`morstrix_art_${currentItemId}`);
-            if (!artData) return alert("Арт пустий.");
-            
-            const name = dataStore.catalogs[currentCatalogId].items[currentItemId].name;
-
-            // Формат даних: "ART|CATALOG_ID_ITEM_ID|JSON_PAYLOAD"
-            const data = `ART|${currentCatalogId}_${currentItemId}|${artData}`;
-
-            if (WebApp) {
-                WebApp.sendData(data);
-                WebApp.close();
-            } else {
-                alert(`ART Data Sent (debug): ${data.substring(0, 100)}...`);
-            }
-        }
-        
-        // --- ЛОГІКА PIXEL ART ---
-
-        function initArtEditor() {
-            canvas = document.getElementById('pixel-canvas');
-            ctx = canvas.getContext('2d');
-            colorPicker = document.getElementById('color-picker');
-            toggleToolBtn = document.getElementById('toggle-tool-btn');
-            clearArtBtn = document.getElementById('clear-art-btn');
-            // sendArtBtn = document.getElementById('send-art-btn'); // ✅ Ініціалізація в initApp
-
-            canvas.width = CANVAS_WIDTH;
-            canvas.height = CANVAS_HEIGHT;
-            
-            initPixelGrid();
-
-            // Обробники
-            canvas.addEventListener('mousedown', handlePointerStart);
-            canvas.addEventListener('mousemove', handlePointerMove);
-            document.addEventListener('mouseup', handlePointerEnd);
-            canvas.addEventListener('touchstart', handlePointerStart);
-            canvas.addEventListener('touchmove', handlePointerMove);
-            canvas.addEventListener('touchend', handlePointerEnd);
-            colorPicker.addEventListener('input', (e) => { currentDrawColor = e.target.value; if (currentTool === 'eraser') toggleTool(); });
-            toggleToolBtn.addEventListener('click', toggleTool);
-            clearArtBtn.addEventListener('click', () => { if(confirm("Очистити?")) { initPixelGrid(); redrawCanvas(); saveArt(currentItemId); } });
-        }
-        
-        function initPixelGrid() {
-            pixelGrid = Array(GRID_DIMENSION).fill(0).map(() => Array(GRID_DIMENSION).fill(null));
-        }
-
-        function redrawCanvas() {
-            ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-            
-            // 1. Малюємо пікселі
-            for (let y = 0; y < GRID_DIMENSION; y++) {
-                for (let x = 0; x < GRID_DIMENSION; x++) {
-                    const color = pixelGrid[y][x];
-                    if (color) {
-                        ctx.fillStyle = color;
-                        ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-                    }
-                }
-            }
-
-            // 2. Малюємо сітку (темно-сіра, як фон холста)
-            ctx.strokeStyle = '#2d2d2d'; 
-            ctx.lineWidth = 1;
-            for (let i = 0; i <= GRID_DIMENSION; i++) {
-                ctx.beginPath();
-                ctx.moveTo(i * CELL_SIZE, 0);
-                ctx.lineTo(i * CELL_SIZE, CANVAS_HEIGHT);
-                ctx.moveTo(0, i * CELL_SIZE);
-                ctx.lineTo(CANVAS_WIDTH, i * CELL_SIZE);
-                ctx.stroke();
-            }
-        }
-
-        function getMousePos(event) {
-            const rect = canvas.getBoundingClientRect();
-            let clientX, clientY;
-            
-            const containerScrollX = window.scrollX || document.documentElement.scrollLeft;
-            const containerScrollY = window.scrollY || document.documentElement.scrollTop;
-
-            if (event.touches) {
-                clientX = event.touches[0].clientX;
-                clientY = event.touches[0].clientY;
-            } else {
-                clientX = event.clientX;
-                clientY = event.clientY;
-            }
-            
-            const x = clientX - rect.left - containerScrollX;
-            const y = clientY - rect.top - containerScrollY;
-
-            return {
-                x: Math.floor(x / CELL_SIZE),
-                y: Math.floor(y / CELL_SIZE)
-            };
-        }
-        
-        let lastX = -1, lastY = -1;
-
-        function drawPixel(x, y) {
-            if (x >= 0 && x < GRID_DIMENSION && y >= 0 && y < GRID_DIMENSION) {
-                if (x === lastX && y === lastY) return; 
-                
-                const color = currentTool === 'pen' ? currentDrawColor : null; // null = erase
-                pixelGrid[y][x] = color;
-                redrawCanvas();
-                saveArt(currentItemId); 
-                
-                lastX = x;
-                lastY = y;
-            }
-        }
-
-        function handlePointerStart(event) {
-            event.preventDefault(); 
-            isDrawing = true;
-            const pos = getMousePos(event);
-            lastX = -1; lastY = -1; 
-            drawPixel(pos.x, pos.y);
-        }
-
-        function handlePointerMove(event) {
-            if (!isDrawing) return;
-            event.preventDefault();
-            const pos = getMousePos(event);
-            drawPixel(pos.x, pos.y);
-        }
-
-        function handlePointerEnd(event) {
-            isDrawing = false;
-            lastX = -1; lastY = -1; 
-        }
-
-        function toggleTool() {
-            if (currentTool === 'pen') {
-                currentTool = 'eraser';
-                toggleToolBtn.innerHTML = '🧼 Ластик';
-            } else {
-                currentTool = 'pen';
-                toggleToolBtn.innerHTML = '✏️ Кисть';
-            }
-        }
-
-        function saveArt(key) {
-            if (key) {
-                localStorage.setItem(`morstrix_art_${key}`, JSON.stringify(pixelGrid));
-            }
-        }
-
-        function loadArt(key) {
-            if (!key) return initPixelGrid();
-            
-            try {
-                const savedData = localStorage.getItem(`morstrix_art_${key}`);
-                if (savedData) {
-                    pixelGrid = JSON.parse(savedData);
-                } else {
-                    initPixelGrid(); 
-                }
-            } catch (e) {
-                initPixelGrid(); 
-            }
-        }
-
-
-        // --- ЗАПУСК ---
-        window.addEventListener('load', initApp);
-    </script>
 </body>
 </html>
