@@ -5,12 +5,12 @@ import asyncio
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
     ChatJoinRequestHandler, CallbackQueryHandler, JobQueue,
-    ConversationHandler,
-    UpdateType # <--- ДОБАВЛЕНО
+    ConversationHandler 
 )
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup 
 from telegram.ext import ContextTypes
-from telegram.constants import ParseMode
+# ✅ ВИПРАВЛЕНО: Додано UpdateType до telegram.constants
+from telegram.constants import ParseMode, UpdateType 
 from dotenv import load_dotenv
 from aiohttp import web 
 
@@ -43,7 +43,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "ᴡᴇʟᴄᴏᴍᴇ \n\n"
         "фунᴋціᴏнᴀʌ:\n"
         "➞ /font - ᴛᴇᴋᴄᴛ ᴄᴛᴀйʌᴇᴘ \n"
-        "➞ /drafts - ɴᴏᴛᴇ/ᴀʀᴛ/ᴘᴜꜱʜ \n"
+        "➞ /drafts - ʜᴏᴛᴇ/ᴀʀᴛ/ᴘᴜꜱʜ \n"
         "➞ ᴀʙᴛᴏпᴘийᴏᴍ зᴀяʙᴏᴋ\n"
         "➞ пᴇᴘᴇʙіᴘᴋᴀ пᴏᴄиʌᴀнь\n\n"
         "➞ ШІ — дʌя чʌᴇніʙ ᴋʌубу.\n"
@@ -98,8 +98,8 @@ application.add_handler(CallbackQueryHandler(handle_callback_query))
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members))
 application.add_handler(ChatJoinRequestHandler(handle_join_request))
 
-# ✅ ИСПРАВЛЕНО: Использование filters.WEB_APP_DATA вместо filters.UpdateType.WEB_APP_DATA
-application.add_handler(MessageHandler(filters.WEB_APP_DATA, handle_web_app_data)) 
+# ✅ ФІНАЛЬНЕ ВИПРАВЛЕННЯ: Використовуємо UpdateType.WEB_APP_DATA, який тепер імпортований коректно
+application.add_handler(MessageHandler(UpdateType.WEB_APP_DATA, handle_web_app_data)) 
 
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_gemini_message_private))
 application.add_handler(MessageHandler(
@@ -168,6 +168,8 @@ async def start_webhook_server(application: Application):
     print(f"Запуск aiohttp Webhook Server на порту {PORT}")
     await site.start()
     
+    # application.start() та application.updater.start_polling() потрібні лише для Polling
+    # Але оскільки вони у Webhook-сервері, вони запускають внутрішній цикл. Залишаємо.
     await application.start()
     await application.updater.start_polling()
 
