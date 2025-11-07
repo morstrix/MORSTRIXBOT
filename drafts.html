@@ -1,3 +1,4 @@
+drafts.html
 <!DOCTYPE html>
 <html lang="uk">
 <head>
@@ -15,17 +16,16 @@
         }
 
         body {
-            font-family: 'Press Start 2P', monospace; /* Ідеальний для піксельарту */
+            font-family: 'Press Start 2P', monospace;
             background-color: var(--bg-color);
             color: var(--text-color);
             margin: 0;
             padding: 0;
             overflow-x: hidden;
-            touch-action: pan-y; /* Покращення скролу на мобільних */
+            touch-action: pan-y;
             image-rendering: pixelated;
         }
         
-        /* Якщо немає шрифту 'Press Start 2P', використовуємо моноширинний */
         @supports not (font-family: 'Press Start 2P') {
              body {
                 font-family: monospace;
@@ -43,11 +43,12 @@
         }
 
         .grid-container {
+            /* 4 КОЛОНКИ */
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(var(--cell-size), 1fr));
-            gap: 1px; /* Імітація тонкої сітки */
+            grid-template-columns: repeat(4, 1fr); 
+            gap: 1px; 
             padding: 10px;
-            background-color: var(--grid-color); /* Колір між клітинками */
+            background-color: var(--grid-color); 
         }
 
         .cell {
@@ -76,15 +77,15 @@
             margin-top: 5px;
         }
 
-        /* Стилі для модального вікна "Кімнати" */
+        /* Стилі для модального вікна */
         .modal {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.95);
-            display: none; /* Приховано за замовчуванням */
+            background: rgba(0, 0, 0, 0.98); /* Трохи прозоріше для ефекту */
+            display: none; 
             justify-content: center;
             align-items: center;
             z-index: 1000;
@@ -92,49 +93,104 @@
         }
 
         .modal-content {
-            width: 90%;
-            max-width: 500px;
+            width: 95%;
+            max-width: 600px;
+            height: 80vh; /* Збільшуємо висоту */
             background: var(--bg-color);
             border: 2px solid var(--text-color);
             padding: 20px;
             box-shadow: 4px 4px 0 var(--accent-color);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* КОНТЕЙНЕР ДЛЯ НОТАТОК (НОВИЙ) */
+        .note-list-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            border: 1px solid var(--grid-color);
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: #000000;
+        }
+
+        .note-item {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-bottom: 1px dotted var(--text-color);
+            font-size: 14px;
+            word-break: break-all;
+            white-space: pre-wrap; /* Зберігає форматування тексту */
+        }
+        
+        .note-item:last-child {
+            border-bottom: none;
         }
 
         textarea {
             width: 100%;
-            height: 200px;
+            height: 100px; /* Зменшуємо висоту для нового вводу */
             background-color: #000000;
             color: var(--text-color);
             border: 1px solid var(--grid-color);
             padding: 10px;
             box-sizing: border-box;
-            resize: none;
+            resize: vertical; /* Дозволяємо лише вертикальну зміну розміру */
             font-family: monospace;
             font-size: 14px;
             margin-bottom: 10px;
         }
+        
+        /* Кнопка додавання нової нотатки */
+        .add-note-btn {
+            background-color: #004d40;
+            color: #fff;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 12px;
+            box-shadow: 1px 1px 0 #000;
+            margin-bottom: 10px;
+        }
+        
+        .add-note-btn:hover {
+            background-color: var(--text-color);
+            color: var(--bg-color);
+        }
 
-        .close-btn, .save-btn {
+        .button-group {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: auto; /* Притискаємо до низу */
+        }
+
+        .close-btn, .save-btn, .send-btn {
             background-color: var(--accent-color);
             color: var(--bg-color);
             border: none;
             padding: 10px 15px;
             cursor: pointer;
-            margin-top: 10px;
             font-family: inherit;
             font-size: 12px;
             box-shadow: 2px 2px 0 #000;
+            flex-grow: 1; 
         }
         
         .save-btn {
             background-color: var(--text-color);
+        }
+
+        .send-btn {
+            background-color: #ff9900;
         }
     </style>
 </head>
 <body>
 
     <div class="header">
-        MORSTRIX ARCHIVE V1.0
+        MORSTRIX ARCHIVE V2.0
     </div>
 
     <div id="grid-container" class="grid-container">
@@ -143,34 +199,45 @@
     <div id="noteModal" class="modal">
         <div class="modal-content">
             <h2 id="modalTitle">Кімната [X, Y]</h2>
-            <textarea id="noteContent" placeholder="Тут ваші нотатки, арти чи повідомлення..."></textarea>
-            <button id="saveNoteBtn" class="save-btn">ЗБЕРЕГТИ</button>
-            <button id="closeModalBtn" class="close-btn">ЗАКРИТИ</button>
+            
+            <div id="noteListContainer" class="note-list-container">
+                </div>
+            
+            <textarea id="noteContent" placeholder="Введіть нову нотатку або арт (один запис)..."></textarea>
+            
+            <button id="addNoteBtn" class="add-note-btn">ДОДАТИ НОТАТКУ</button>
+
+            <div class="button-group">
+                <button id="saveNoteBtn" class="save-btn">ЗБЕРЕГТИ ВСЕ</button>
+                <button id="sendNoteBtn" class="send-btn">НАДІСЛАТИ ОСТАННЄ</button>
+                <button id="closeModalBtn" class="close-btn">ЗАКРИТИ</button>
+            </div>
         </div>
     </div>
 
     <script>
-        const GRID_SIZE = 5; // Створюємо сітку 5x5
+        const GRID_ROWS = 7; // 7 РЯДКІВ
+        const GRID_COLS = 4; // 4 КОЛОНКИ
         const gridContainer = document.getElementById('grid-container');
         const noteModal = document.getElementById('noteModal');
         const modalTitle = document.getElementById('modalTitle');
-        const noteContent = document.getElementById('noteContent');
+        const noteContentInput = document.getElementById('noteContent'); // Змінено назву
+        const noteListContainer = document.getElementById('noteListContainer'); // Новий елемент
+        const addNoteBtn = document.getElementById('addNoteBtn'); // Нова кнопка
         const saveNoteBtn = document.getElementById('saveNoteBtn');
+        const sendNoteBtn = document.getElementById('sendNoteBtn');
         const closeModalBtn = document.getElementById('closeModalBtn');
 
         let currentCellKey = null;
+        let allNotes = loadNotes();
 
         // ----------------------------------------------------
         // 💾 LOCAL STORAGE ФУНКЦІЇ
         // ----------------------------------------------------
 
-        /**
-         * Завантажує всі нотатки з Local Storage.
-         * @returns {Object} Об'єкт, де ключ - це ID клітинки (напр., 'cell_2_3'), значення - текст.
-         */
         function loadNotes() {
             try {
-                const data = localStorage.getItem('morstrix_drafts');
+                const data = localStorage.getItem('morstrix_drafts_v2'); // Змінено ключ
                 return data ? JSON.parse(data) : {};
             } catch (e) {
                 console.error("Помилка завантаження LocalStorage:", e);
@@ -178,15 +245,10 @@
             }
         }
 
-        /**
-         * Зберігає всі нотатки у Local Storage.
-         * @param {Object} notes Об'єкт нотаток для збереження.
-         */
-        function saveNotes(notes) {
+        function saveNotes() {
             try {
-                localStorage.setItem('morstrix_drafts', JSON.stringify(notes));
+                localStorage.setItem('morstrix_drafts_v2', JSON.stringify(allNotes));
                 if (window.Telegram && window.Telegram.WebApp) {
-                    // Тактильний відгук
                     window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
                 }
             } catch (e) {
@@ -196,69 +258,156 @@
                 }
             }
         }
-
+        
         // ----------------------------------------------------
         // 🏗️ ГЕНЕРАЦІЯ СІТКИ ТА ЛОГІКА
         // ----------------------------------------------------
-        
-        const allNotes = loadNotes();
 
         function generateGrid() {
             gridContainer.innerHTML = '';
-            for (let row = 1; row <= GRID_SIZE; row++) {
-                for (let col = 1; col <= GRID_SIZE; col++) {
+            for (let row = 1; row <= GRID_ROWS; row++) {
+                for (let col = 1; col <= GRID_COLS; col++) {
                     const cellKey = `cell_${row}_${col}`;
                     const cellDiv = document.createElement('div');
                     cellDiv.className = 'cell';
                     cellDiv.dataset.key = cellKey;
                     
-                    // Перевіряємо, чи є нотатки для цієї клітинки
-                    const hasNote = !!allNotes[cellKey] && allNotes[cellKey].trim() !== '';
+                    // Перевіряємо, чи є нотатки для цієї клітинки (тепер це масив)
+                    const noteArray = allNotes[cellKey];
+                    const count = noteArray ? noteArray.length : 0;
+                    const hasNote = count > 0;
 
-                    cellDiv.innerHTML = `[${row}, ${col}] ${hasNote ? '<div class="note-indicator">⚡️</div>' : ''}`;
+                    cellDiv.innerHTML = `[${row}, ${col}] ${hasNote ? `<div class="note-indicator">⚡️(${count})</div>` : ''}`;
                     cellDiv.addEventListener('click', () => openCell(cellKey, row, col));
                     gridContainer.appendChild(cellDiv);
                 }
             }
         }
 
+        function renderNoteList(cellKey) {
+            noteListContainer.innerHTML = '';
+            const notes = allNotes[cellKey] || [];
+            
+            if (notes.length === 0) {
+                noteListContainer.innerHTML = '<div style="color: #999; text-align: center; margin-top: 20px;">Нотаток немає. Додайте першу!</div>';
+                return;
+            }
+
+            notes.forEach((note, index) => {
+                const noteItem = document.createElement('div');
+                noteItem.className = 'note-item';
+                // Відображаємо нотатку та додаємо кнопку видалення
+                noteItem.innerHTML = `<span style="color: var(--accent-color);">${index + 1}.</span> ${note} <button onclick="deleteNote('${cellKey}', ${index})" style="float: right; background: red; color: white; border: none; padding: 2px 5px; cursor: pointer; font-family: monospace;">X</button>`;
+                noteListContainer.appendChild(noteItem);
+            });
+        }
+        
+        // Глобальна функція для видалення нотатки
+        window.deleteNote = (cellKey, index) => {
+            if (allNotes[cellKey] && allNotes[cellKey].length > index) {
+                allNotes[cellKey].splice(index, 1);
+                
+                // Якщо масив порожній, видаляємо ключ клітинки
+                if (allNotes[cellKey].length === 0) {
+                    delete allNotes[cellKey];
+                }
+                
+                renderNoteList(cellKey);
+                updateCellDisplay(cellKey);
+                saveNotes();
+            }
+        };
+
         function openCell(cellKey, row, col) {
             currentCellKey = cellKey;
             modalTitle.textContent = `Кімната [${row}, ${col}]`;
-            // Завантажуємо текст для поточної клітинки
-            noteContent.value = allNotes[cellKey] || '';
+            
+            noteContentInput.value = ''; // Очищуємо поле вводу
+            renderNoteList(cellKey); // Відображаємо поточний список нотаток
+            
             noteModal.style.display = 'flex';
             
             if (window.Telegram && window.Telegram.WebApp) {
-                window.Telegram.WebApp.expand(); // Розгортаємо Web App на весь екран
-                window.Telegram.WebApp.BackButton.show(); // Показуємо кнопку "Назад" Telegram
+                window.Telegram.WebApp.expand();
+                window.Telegram.WebApp.BackButton.show();
+            }
+        }
+        
+        function addNote() {
+            if (currentCellKey) {
+                const content = noteContentInput.value.trim();
+                if (content === '') {
+                    alert("Введіть текст нотатки або арт перед додаванням.");
+                    return;
+                }
+                
+                // Ініціалізуємо масив, якщо він ще не існує
+                if (!allNotes[currentCellKey]) {
+                    allNotes[currentCellKey] = [];
+                }
+                
+                allNotes[currentCellKey].push(content);
+                noteContentInput.value = ''; // Очищуємо поле
+                renderNoteList(currentCellKey); // Оновлюємо список
+                updateCellDisplay(currentCellKey); // Оновлюємо вигляд сітки
+                saveNotes(); // Зберігаємо
             }
         }
 
-        function saveAndClose() {
-            if (currentCellKey) {
-                const content = noteContent.value.trim();
-                if (content === '') {
-                    delete allNotes[currentCellKey]; // Видаляємо, якщо пусто
-                } else {
-                    allNotes[currentCellKey] = content;
-                }
-                saveNotes(allNotes); // Зберігаємо у Local Storage
-                
-                // Оновлюємо відображення клітинки
-                const row = currentCellKey.split('_')[1];
-                const col = currentCellKey.split('_')[2];
-                const currentCellDiv = document.querySelector(`.cell[data-key="${currentCellKey}"]`);
-                if (currentCellDiv) {
-                    const hasNote = !!allNotes[currentCellKey];
-                    currentCellDiv.innerHTML = `[${row}, ${col}] ${hasNote ? '<div class="note-indicator">⚡️</div>' : ''}`;
-                }
-
-                currentCellKey = null;
+        function updateCellDisplay(cellKey) {
+            const row = cellKey.split('_')[1];
+            const col = cellKey.split('_')[2];
+            const currentCellDiv = document.querySelector(`.cell[data-key="${cellKey}"]`);
+            if (currentCellDiv) {
+                const count = allNotes[cellKey] ? allNotes[cellKey].length : 0;
+                const hasNote = count > 0;
+                currentCellDiv.innerHTML = `[${row}, ${col}] ${hasNote ? `<div class="note-indicator">⚡️(${count})</div>` : ''}`;
             }
+        }
+
+        function saveAllAndClose() {
+            // У V2.0 збереження відбувається автоматично при 'addNote' та 'deleteNote'
+            // Тут просто закриваємо
+            currentCellKey = null;
+            closeModal();
+        }
+
+        function closeModal() {
             noteModal.style.display = 'none';
+            currentCellKey = null;
             if (window.Telegram && window.Telegram.WebApp) {
-                 window.Telegram.WebApp.BackButton.hide(); // Приховуємо кнопку "Назад" Telegram
+                 window.Telegram.WebApp.BackButton.hide(); 
+            }
+        }
+
+        function sendNote() {
+            if (currentCellKey) {
+                const notes = allNotes[currentCellKey] || [];
+                if (notes.length === 0) {
+                    alert("У цій кімнаті немає нотаток для надсилання.");
+                    return;
+                }
+                
+                // Надсилаємо останню нотатку (або об'єднаний текст)
+                const lastNote = notes[notes.length - 1]; 
+                
+                if (window.Telegram && window.Telegram.WebApp) {
+                    // Надсилаємо останню нотатку
+                    window.Telegram.WebApp.sendData(lastNote);
+                    // Видаляємо її після успішної відправки
+                    allNotes[currentCellKey].pop();
+                    if (allNotes[currentCellKey].length === 0) {
+                         delete allNotes[currentCellKey];
+                    }
+                    saveNotes();
+                    closeModal();
+                    
+                    if (window.Telegram.WebApp.isClosing) return; // Уникнути помилки, якщо додаток вже закривається
+                    updateCellDisplay(currentCellKey);
+                    
+                } else {
+                    alert("Помилка: Не вдалося знайти Telegram WebApp API.");
+                }
             }
         }
 
@@ -269,17 +418,19 @@
         document.addEventListener('DOMContentLoaded', () => {
             if (window.Telegram && window.Telegram.WebApp) {
                 window.Telegram.WebApp.ready();
-                window.Telegram.WebApp.BackButton.hide(); // Переконатися, що кнопка прихована при запуску
+                window.Telegram.WebApp.BackButton.hide();
             }
             generateGrid();
         });
 
-        saveNoteBtn.addEventListener('click', saveAndClose);
-        closeModalBtn.addEventListener('click', saveAndClose); // Закриваємо з дією збереження/відхилення
+        addNoteBtn.addEventListener('click', addNote);
+        saveNoteBtn.addEventListener('click', saveAllAndClose);
+        sendNoteBtn.addEventListener('click', sendNote); 
+        closeModalBtn.addEventListener('click', closeModal); 
 
         // Додаємо обробник для кнопки "Назад" у Telegram
         if (window.Telegram && window.Telegram.WebApp) {
-            window.Telegram.WebApp.onEvent('backButtonClicked', saveAndClose);
+            window.Telegram.WebApp.onEvent('backButtonClicked', saveAllAndClose);
         }
     </script>
 </body>
