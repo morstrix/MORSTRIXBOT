@@ -17,7 +17,7 @@ from handlers import (
     handle_new_members, handle_join_request, handle_callback_query,
     open_drafts_webapp, handle_webapp_data # handle_webapp_data - нова функція
 )
-from safe import check_links
+# from safe import check_links # (Закоментував, оскільки у нас немає файлу safe.py)
 from weather import weather_command
 from translator import translate_text_command, handle_translation_text, TRANSLATE_STATE
 
@@ -70,8 +70,8 @@ application.add_handler(MessageHandler(
 
 # Обробники Gemini та посилань...
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_gemini_message_private))
-link_filters = filters.Entity("url") | filters.Entity("text_link")
-application.add_handler(MessageHandler(link_filters & filters.ChatType.GROUPS, check_links))
+# link_filters = filters.Entity("url") | filters.Entity("text_link")
+# application.add_handler(MessageHandler(link_filters & filters.ChatType.GROUPS, check_links))
 application.add_handler(MessageHandler(
     filters.TEXT & ~filters.COMMAND & filters.Regex(r'(?i)ало') & filters.ChatType.GROUPS,
     handle_gemini_message_group
@@ -85,8 +85,18 @@ application.add_handler(MessageHandler(
 @app.route(f'/{TELEGRAM_BOT_TOKEN}', methods=['POST'])
 async def telegram_webhook():
     """Обробляє запити Webhook від Telegram."""
-    await application.update_queue.put(Update.de_json(data=request.get_json(force=True), bot=application.bot))
-    return "ok"
+    if request.content_length > 10**6: # Обмеження розміру запиту (наприклад, 1MB)
+        print("Запит занадто великий, ігнорується.")
+        return "request too large", 413
+        
+    try:
+        data = request.get_json(force=True)
+    except Exception as e:
+        print(f"Помилка отримання JSON: {e}")
+        return "bad request", 400
+        
+    await application.update_queue.put(Update.de_json(data=data, bot=application.bot))
+    return "ok", 200
 
 @app.route('/drafts')
 def webapp_drafts():
@@ -94,23 +104,51 @@ def webapp_drafts():
     # Flask шукає drafts.html у папці 'templates'
     return render_template('drafts.html') 
 
+@app.route('/')
+def index():
+    """Проста сторінка, щоб перевірити, чи працює Flask."""
+    return "Flask server is running."
+
 # ----------------------------------------------------
 #                      Запуск
 # ----------------------------------------------------
 
-def main():
-    if os.getenv("RENDER") == "true":
-        # Налаштування Webhook
-        base_url = RENDER_EXTERNAL_URL.rstrip('/') if RENDER_EXTERNAL_URL else ""
+async def setup_webhook():
+    """Встановлює вебхук."""
+    if RENDER_EXTERNAL_URL and TELEGRAM_BOT_TOKEN:
+        base_url = RENDER_EXTERNAL_URL.rstrip('/')
         full_webhook_url = f"{base_url}/{TELEGRAM_BOT_TOKEN}"
         
-        # Встановлюємо Webhook у Telegram
-        application.run_polling(drop_pending_updates=True) # Потрібно викликати хоча б раз для синхронізації
-        application.set_webhook(url=full_webhook_url, allowed_updates=Update.ALL_TYPES)
+        print(f"Встановлення вебхука на: {full_webhook_url}")
+        try:
+            await application.bot.set_webhook(
+                url=full_webhook_url,
+                allowed_updates=Update.ALL_TYPES,
+                drop_pending_updates=True
+            )
+            print("Вебхук успішно встановлено.")
+        except Exception as e:
+            print(f"Помилка встановлення вебхука: {e}")
+    else:
+        print("RENDER_EXTERNAL_URL або TELEGRAM_BOT_TOKEN не встановлено. Вебхук не налаштовано.")
+
+def main():
+    # Ініціалізація JobQueue (потрібна для application.job_queue в хендлерах)
+    application.job_queue = job_queue
+
+    if os.getenv("RENDER") == "true":
+        print("Запуск в режимі Webhook (Render)...")
         
-        print(f"Flask Web App та Telegram Webhook запущені на порту {PORT}")
+        # Налаштовуємо та запускаємо вебхук асинхронно
+        # Використовуємо 'loop' з application для запуску async функції
+        loop = application.loop
+        try:
+            loop.run_until_complete(setup_webhook())
+        except Exception as e:
+            print(f"Помилка під час асинхронного запуску setup_webhook: {e}")
+            
+        print(f"Запуск Flask Web App на порту {PORT}")
         # Запускаємо Flask на тому ж порту, що і Webhook
-        # application.run_webhook не використовуємо
         app.run(host="0.0.0.0", port=PORT, debug=False)
 
     else:
@@ -118,9 +156,7 @@ def main():
         application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
-    # Запускаємо Application.run_polling() перед application.set_webhook()
-    # Це гарантує, що всі хендлери і JobQueue ініціалізовані.
     try:
         main()
     except Exception as e:
-        print(f"Сталася помилка при запуску: {e}")
+        print(f"Сталася фатальна помилка при запуску: {e}")
