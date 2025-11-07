@@ -55,6 +55,7 @@
             background-color: var(--bg-color);
             border: 1px solid var(--grid-color);
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             cursor: pointer;
@@ -129,7 +130,7 @@
             background-color: var(--text-color);
         }
     </style>
-    </head>
+</head>
 <body>
 
     <div class="header">
@@ -185,6 +186,7 @@
             try {
                 localStorage.setItem('morstrix_drafts', JSON.stringify(notes));
                 if (window.Telegram && window.Telegram.WebApp) {
+                    // Тактильний відгук
                     window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
                 }
             } catch (e) {
@@ -226,8 +228,10 @@
             // Завантажуємо текст для поточної клітинки
             noteContent.value = allNotes[cellKey] || '';
             noteModal.style.display = 'flex';
+            
             if (window.Telegram && window.Telegram.WebApp) {
                 window.Telegram.WebApp.expand(); // Розгортаємо Web App на весь екран
+                window.Telegram.WebApp.BackButton.show(); // Показуємо кнопку "Назад" Telegram
             }
         }
 
@@ -242,15 +246,20 @@
                 saveNotes(allNotes); // Зберігаємо у Local Storage
                 
                 // Оновлюємо відображення клітинки
+                const row = currentCellKey.split('_')[1];
+                const col = currentCellKey.split('_')[2];
                 const currentCellDiv = document.querySelector(`.cell[data-key="${currentCellKey}"]`);
                 if (currentCellDiv) {
                     const hasNote = !!allNotes[currentCellKey];
-                    currentCellDiv.innerHTML = `[${currentCellKey.split('_')[1]}, ${currentCellKey.split('_')[2]}] ${hasNote ? '<div class="note-indicator">⚡️</div>' : ''}`;
+                    currentCellDiv.innerHTML = `[${row}, ${col}] ${hasNote ? '<div class="note-indicator">⚡️</div>' : ''}`;
                 }
 
                 currentCellKey = null;
             }
             noteModal.style.display = 'none';
+            if (window.Telegram && window.Telegram.WebApp) {
+                 window.Telegram.WebApp.BackButton.hide(); // Приховуємо кнопку "Назад" Telegram
+            }
         }
 
         // ----------------------------------------------------
@@ -260,17 +269,15 @@
         document.addEventListener('DOMContentLoaded', () => {
             if (window.Telegram && window.Telegram.WebApp) {
                 window.Telegram.WebApp.ready();
+                window.Telegram.WebApp.BackButton.hide(); // Переконатися, що кнопка прихована при запуску
             }
             generateGrid();
         });
 
         saveNoteBtn.addEventListener('click', saveAndClose);
-        closeModalBtn.addEventListener('click', () => {
-            noteModal.style.display = 'none';
-            currentCellKey = null;
-        });
+        closeModalBtn.addEventListener('click', saveAndClose); // Закриваємо з дією збереження/відхилення
 
-        // Додаємо обробник для кнопки "Назад" у Telegram, якщо вона активна
+        // Додаємо обробник для кнопки "Назад" у Telegram
         if (window.Telegram && window.Telegram.WebApp) {
             window.Telegram.WebApp.onEvent('backButtonClicked', saveAndClose);
         }
