@@ -1,4 +1,4 @@
-# main.py (ОНОВЛЕНИЙ КОД БЕЗ ПОГОДИ ТА ПЕРЕКЛАДАЧА)
+# main.py
 
 import os
 import json
@@ -10,7 +10,8 @@ from telegram.ext import (
 from telegram import Update
 from telegram.ext import ContextTypes
 from dotenv import load_dotenv
-from flask import Flask, request, render_template
+# ОНОВЛЕНО: Додано send_file
+from flask import Flask, request, render_template, send_file 
 
 # Імпорти ваших модулів
 from ai import handle_gemini_message_group, handle_gemini_message_private
@@ -100,8 +101,9 @@ async def telegram_webhook():
 
 @app.route('/drafts')
 def webapp_drafts():
-    """Обслуговує HTML-файл для Web App."""
-    return render_template('drafts.html') 
+    """Обслуговує HTML-файл для Web App, гарантуючи коректний MIME-тип."""
+    # ВИПРАВЛЕНО: Використовуємо send_file для гарантованої віддачі з Content-Type: text/html
+    return send_file('drafts.html', mimetype='text/html') 
 
 @app.route('/')
 def index():
