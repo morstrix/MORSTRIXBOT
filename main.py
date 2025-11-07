@@ -17,7 +17,7 @@ from handlers import (
     handle_new_members, handle_join_request, handle_callback_query,
     open_drafts_webapp, handle_webapp_data # handle_webapp_data - нова функція
 )
-# from safe import check_links # (Закоментував, оскільки у нас немає файлу safe.py)
+# from safe import check_links # (Був закоментований або не існував, але його імпорт був у старому main.py)
 from weather import weather_command
 from translator import translate_text_command, handle_translation_text, TRANSLATE_STATE
 
@@ -43,6 +43,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Ініціалізація об'єкта application
 job_queue = JobQueue()
+# JobQueue встановлюється тут:
 application = Application.builder().token(TELEGRAM_BOT_TOKEN).job_queue(job_queue).build()
 
 # Реєстрація Обробників
@@ -62,11 +63,7 @@ application.add_handler(translate_conv_handler)
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members))
 application.add_handler(ChatJoinRequestHandler(handle_join_request))
 
-# =================================================================
-# === 💥 ОСЬ ФІНАЛЬНЕ ВИПРАВЛЕННЯ 💥 ===
-#
-# Правильний фільтр: "filters.StatusUpdate.WEB_APP_DATA"
-# =================================================================
+# === ВИПРАВЛЕННЯ WebApp: ВИКОРИСТОВУЄМО filters.StatusUpdate.WEB_APP_DATA 
 application.add_handler(MessageHandler(
     filters.StatusUpdate.WEB_APP_DATA,
     handle_webapp_data
@@ -137,14 +134,12 @@ async def setup_webhook():
         print("RENDER_EXTERNAL_URL або TELEGRAM_BOT_TOKEN не встановлено. Вебхук не налаштовано.")
 
 def main():
-    # Ініціалізація JobQueue (потрібна для application.job_queue в хендлерах)
-    application.job_queue = job_queue
+    # --- ВИДАЛЕНО: application.job_queue = job_queue, оскільки він вже встановлений в Application.builder() ---
 
     if os.getenv("RENDER") == "true":
         print("Запуск в режимі Webhook (Render)...")
         
         # Налаштовуємо та запускаємо вебхук асинхронно
-        # Використовуємо 'loop' з application для запуску async функції
         loop = application.loop
         try:
             loop.run_until_complete(setup_webhook())
