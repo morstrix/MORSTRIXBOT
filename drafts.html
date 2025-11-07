@@ -4,17 +4,23 @@ drafts.html
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MORSTRIX | Архів (Pixel Art)</title>
+    <title>MORSTRIX | Чернетки</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap'); /* Ретро-шрифт */
+
         :root {
-            --bg-color: #000000; /* Чорний фон */
-            --grid-color: #3a3a3a; /* Темно-графітовий для сітки/рамки */
-            --text-color: #00ff00; /* Яскраво-зелений для тексту */
-            --accent-color: #ff00ff; /* Маджента для акценту */
-            --draw-color: #ffffff; /* Білий для кисті (запит користувача) */
+            --bg-color: #1a1a1a; /* Темний графіт */
+            --grid-color: #383838; /* Лінії сітки */
+            --text-color: #00ff00; /* Ретро-зелений */
+            --accent-color: #ff00ff; /* Маджента */
+            --dark-cell-color: #111111; /* Темніша клітинка сітки */
+            --light-cell-color: #222222; /* Світліша клітинка сітки */
+            --draw-color: #ffffff; /* Основний колір малювання */
             --erase-color: #000000; /* Колір стирання */
             --cell-size: 80px;
+            --button-bg: #009900; /* Зелена кнопка */
+            --button-hover: #00cc00;
         }
 
         body {
@@ -26,6 +32,7 @@ drafts.html
             overflow-x: hidden;
             touch-action: pan-y;
             image-rendering: pixelated;
+            font-size: 10px;
         }
         
         @supports not (font-family: 'Press Start 2P') {
@@ -38,10 +45,11 @@ drafts.html
             text-align: center;
             padding: 10px;
             background-color: var(--grid-color);
-            color: var(--draw-color); /* Білий заголовок */
+            color: var(--draw-color);
             box-shadow: 0 4px 0 var(--accent-color);
             margin-bottom: 5px;
             text-shadow: 2px 2px 0 #000;
+            font-size: 14px;
         }
 
         .grid-container {
@@ -55,7 +63,7 @@ drafts.html
 
         .cell {
             min-height: var(--cell-size);
-            background-color: var(--bg-color);
+            background-color: var(--dark-cell-color); /* Темна клітинка */
             border: 1px solid var(--grid-color);
             display: flex;
             flex-direction: column;
@@ -65,21 +73,38 @@ drafts.html
             transition: background-color 0.1s;
             text-align: center;
             padding: 5px;
-            font-size: 10px;
+            font-size: 8px;
+            box-shadow: 2px 2px 0 #000;
         }
+
+        /* Шахматний візерунок */
+        .grid-container .cell:nth-child(8n+1),
+        .grid-container .cell:nth-child(8n+3),
+        .grid-container .cell:nth-child(8n+6),
+        .grid-container .cell:nth-child(8n+8) {
+            background-color: var(--light-cell-color);
+        }
+        
+        .grid-container .cell:nth-child(8n+2),
+        .grid-container .cell:nth-child(8n+4),
+        .grid-container .cell:nth-child(8n+5),
+        .grid-container .cell:nth-child(8n+7) {
+            background-color: var(--dark-cell-color);
+        }
+
 
         .cell:hover {
-            background-color: #1a1a1a;
+            box-shadow: 0 0 5px var(--text-color);
         }
 
-        .note-indicator {
-            color: var(--draw-color); /* Білий індикатор */
+        .draft-indicator {
+            color: var(--accent-color);
             font-size: 14px;
             text-shadow: 1px 1px 0 #000;
             margin-top: 5px;
         }
-
-        /* Стилі для модального вікна (Редактора) */
+        
+        /* --- Модальні вікна --- */
         .modal {
             position: fixed;
             top: 0;
@@ -99,7 +124,7 @@ drafts.html
             max-width: 600px;
             height: 80vh; 
             background: var(--bg-color);
-            border: 2px solid var(--grid-color); /* Рамка темно-графітова */
+            border: 2px solid var(--text-color); 
             padding: 20px;
             box-shadow: 4px 4px 0 var(--accent-color);
             display: flex;
@@ -107,6 +132,80 @@ drafts.html
             align-items: center;
         }
         
+        .modal-title {
+            color: var(--draw-color);
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 0 #000;
+            font-size: 14px;
+        }
+        
+        /* --- Кнопки управління (Спільні) --- */
+        .button-group {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            width: 100%;
+            max-width: 300px;
+            margin-top: auto; 
+        }
+
+        .action-btn {
+            background-color: var(--button-bg);
+            color: var(--bg-color);
+            border: none;
+            padding: 10px 15px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 10px;
+            box-shadow: 2px 2px 0 #000;
+            flex-grow: 1; 
+            transition: background-color 0.1s;
+        }
+        
+        .action-btn:hover {
+             background-color: var(--button-hover);
+        }
+        
+        .cancel-btn {
+            background-color: var(--grid-color);
+            color: var(--draw-color);
+        }
+        
+        .delete-btn {
+            background-color: #990000; /* Червоний */
+        }
+        
+        /* --- Модальне вікно вибору типу --- */
+        #selectModal .button-group {
+            flex-direction: column;
+            gap: 20px;
+            margin: auto;
+        }
+        
+        #selectModal .action-btn {
+            padding: 15px;
+        }
+        
+        /* --- Редактор Замітки (Note) --- */
+        #noteModal textarea {
+            width: 100%;
+            flex-grow: 1;
+            padding: 10px;
+            background-color: var(--dark-cell-color);
+            color: var(--text-color);
+            border: 1px solid var(--grid-color);
+            font-family: monospace;
+            font-size: 12px;
+            resize: none;
+            box-sizing: border-box;
+            box-shadow: inset 1px 1px 0 #000;
+        }
+        
+        #noteModal .button-group {
+            margin-top: 20px;
+        }
+        
+        /* --- Редактор Арту (Art) --- */
         #art-container {
             display: flex;
             flex-direction: column;
@@ -116,7 +215,7 @@ drafts.html
         }
         
         #pixel-canvas {
-            border: 2px solid var(--draw-color); /* Біла рамка навколо Canvas */
+            border: 2px solid var(--draw-color); 
             box-shadow: 0 0 10px var(--accent-color);
             image-rendering: pixelated;
             touch-action: none; 
@@ -131,15 +230,17 @@ drafts.html
             display: flex;
             gap: 10px;
             width: 100%;
-            max-width: 256px; /* Ширина як у Canvas */
+            max-width: 256px; 
             justify-content: space-between;
         }
         
         .tool-indicator {
             color: var(--draw-color);
-            font-size: 12px;
+            font-size: 10px;
             padding: 8px;
             background-color: var(--grid-color);
+            flex-grow: 1;
+            text-align: center;
         }
 
         .art-btn {
@@ -149,42 +250,44 @@ drafts.html
             padding: 8px 10px;
             cursor: pointer;
             font-family: inherit;
-            font-size: 12px;
+            font-size: 10px;
             box-shadow: 2px 2px 0 #000;
         }
-
-        .art-btn.active {
-            background-color: var(--text-color);
-        }
         
-        .button-group {
+        /* --- Редактор Пуша (Push) --- */
+        #pushModal form {
             display: flex;
-            justify-content: space-between;
-            gap: 10px;
+            flex-direction: column;
+            gap: 15px;
             width: 100%;
-            max-width: 256px; /* Ширина як у Canvas */
-            margin-top: auto; 
-        }
-
-        .save-btn, .send-btn, .close-btn {
-            background-color: var(--text-color);
-            color: var(--bg-color);
-            border: none;
-            padding: 10px 15px;
-            cursor: pointer;
-            font-family: inherit;
-            font-size: 12px;
-            box-shadow: 2px 2px 0 #000;
-            flex-grow: 1; 
-        }
-
-        .send-btn {
-            background-color: #ff9900;
+            max-width: 400px;
+            flex-grow: 1;
         }
         
-        .close-btn {
-            background-color: var(--grid-color);
-            color: var(--draw-color);
+        #pushModal label {
+            font-size: 10px;
+            color: var(--text-color);
+        }
+        
+        #pushModal input, #pushModal textarea {
+            padding: 10px;
+            background-color: var(--dark-cell-color);
+            color: var(--text-color);
+            border: 1px solid var(--grid-color);
+            font-family: monospace;
+            font-size: 12px;
+            box-shadow: inset 1px 1px 0 #000;
+            box-sizing: border-box;
+            width: 100%;
+        }
+        
+        #pushModal textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        
+        #pushModal .button-group {
+            margin-top: 20px;
         }
 
     </style>
@@ -192,37 +295,86 @@ drafts.html
 <body>
 
     <div class="header">
-        MORSTRIX ART V3.0
+        MORSTRIX | ЧЕРНЕТКИ 4x7
     </div>
 
     <div id="grid-container" class="grid-container">
         </div>
 
+    <div id="selectModal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-title">ЧЕРНЕТКА [<span id="selectCoords">X, Y</span>]</h2>
+            
+            <div class="button-group">
+                <button id="selectNoteBtn" class="action-btn">📝 ЗАМІТКА</button>
+                <button id="selectArtBtn" class="action-btn">🎨 АРТ (8x8)</button>
+                <button id="selectPushBtn" class="action-btn">⏰ НАГАДУВАННЯ (ПУШ)</button>
+            </div>
+            
+            <div class="button-group" style="max-width: 100px; margin-top: 40px;">
+                <button id="cancelSelectBtn" class="action-btn cancel-btn">СКАСУВАТИ</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="noteModal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-title">📝 ЗАМІТКА [<span id="noteCoords">X, Y</span>]</h2>
+            <textarea id="noteTextarea" placeholder="Введіть ваш текст..."></textarea>
+            
+            <div class="button-group">
+                <button id="saveNoteBtn" class="action-btn">ЗБЕРЕГТИ</button>
+                <button id="deleteNoteBtn" class="action-btn delete-btn">ВИДАЛИТИ</button>
+                <button id="closeNoteBtn" class="action-btn cancel-btn">ЗАКРИТИ</button>
+            </div>
+        </div>
+    </div>
+    
     <div id="artModal" class="modal">
         <div class="modal-content">
-            <h2 id="modalTitle">АРТ [X, Y]</h2>
+            <h2 class="modal-title">🎨 АРТ [<span id="artCoords">X, Y</span>] (8x8)</h2>
             
             <div id="art-container">
                 <canvas id="pixel-canvas" width="256" height="256"></canvas>
             </div>
             
             <div class="art-controls">
-                <div id="toolIndicator" class="tool-indicator">
+                <div id="artToolIndicator" class="tool-indicator">
                     ІНСТРУМЕНТ: **КИСТЬ**
                 </div>
                 <button id="clearArtBtn" class="art-btn">ОЧИСТИТИ</button>
                 <button id="toggleToolBtn" class="art-btn">
-                    <span id="toolName">ЛАСТИК</span>
+                    <span id="artToolName">ЛАСТИК</span>
                 </button>
             </div>
 
-
-            <div class="button-group">
-                <button id="saveAndCloseBtn" class="save-btn">ЗБЕРЕГТИ & ЗАКРИТИ</button>
-                <button id="sendArtBtn" class="send-btn">НАДІСЛАТИ</button>
+            <div class="button-group" style="max-width: 350px;">
+                <button id="saveArtAndCloseBtn" class="action-btn">ЗБЕРЕГТИ & ЗАКРИТИ</button>
+                <button id="sendArtBtn" class="action-btn">НАДІСЛАТИ</button>
             </div>
         </div>
     </div>
+
+    <div id="pushModal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-title">⏰ НАГАДУВАННЯ [<span id="pushCoords">X, Y</span>]</h2>
+            
+            <form id="pushForm">
+                 <label for="pushTextarea">ТЕКСТ НАГАДУВАННЯ:</label>
+                 <textarea id="pushTextarea" placeholder="Що нагадати?"></textarea>
+                 
+                 <label for="pushDateTime">ЧАС НАДІСЛАННЯ:</label>
+                 <input type="datetime-local" id="pushDateTime" required>
+            </form>
+            
+            <div class="button-group">
+                <button id="schedulePushBtn" class="action-btn">ЗАПЛАНУВАТИ</button>
+                <button id="deletePushBtn" class="action-btn delete-btn">ВИДАЛИТИ</button>
+                <button id="closePushBtn" class="action-btn cancel-btn">ЗАКРИТИ</button>
+            </div>
+        </div>
+    </div>
+
 
     <script>
         const GRID_ROWS = 7;
@@ -233,36 +385,45 @@ drafts.html
         
         // Отримання кольорів з CSS змінних
         const getCssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-        const WHITE_COLOR = getCssVar('--draw-color'); // #ffffff (Кисть)
-        const ERASER_COLOR = getCssVar('--erase-color'); // #000000 (Ластик)
-        const GRID_COLOR = getCssVar('--grid-color'); // #3a3a3a (Лінії)
+        const WHITE_COLOR = getCssVar('--draw-color'); 
+        const ERASER_COLOR = getCssVar('--erase-color'); 
+        const GRID_COLOR = getCssVar('--grid-color'); 
 
         const gridContainer = document.getElementById('grid-container');
+        
+        // Модальні вікна
+        const selectModal = document.getElementById('selectModal');
+        const noteModal = document.getElementById('noteModal');
         const artModal = document.getElementById('artModal');
-        const modalTitle = document.getElementById('modalTitle');
+        const pushModal = document.getElementById('pushModal');
+
+        // Елементи Замітки
+        const noteTextarea = document.getElementById('noteTextarea');
+        
+        // Елементи Арту
         const canvas = document.getElementById('pixel-canvas');
         const ctx = canvas.getContext('2d');
-        const clearArtBtn = document.getElementById('clearArtBtn');
-        const toggleToolBtn = document.getElementById('toggleToolBtn');
-        const toolIndicator = document.getElementById('toolIndicator');
-        const toolNameSpan = document.getElementById('toolName');
-        const saveAndCloseBtn = document.getElementById('saveAndCloseBtn');
-        const sendArtBtn = document.getElementById('sendArtBtn');
+        const artToolIndicator = document.getElementById('artToolIndicator');
+        const artToolNameSpan = document.getElementById('artToolName');
+
+        // Елементи Пуша
+        const pushTextarea = document.getElementById('pushTextarea');
+        const pushDateTime = document.getElementById('pushDateTime');
         
         let currentCellKey = null;
-        let allArts = loadArts();
-        let pixelGrid = []; // Масив для зберігання стану пікселів
-        let currentTool = 'brush'; // 'brush' або 'eraser'
-        let isDrawing = false; // Для малювання при дотику
+        let allDrafts = loadDrafts();
+        let pixelGrid = []; // Масив для зберігання стану пікселів арту
+        let currentTool = 'brush'; 
+        let isDrawing = false; 
 
         // ----------------------------------------------------
         // 💾 LOCAL STORAGE ФУНКЦІЇ
         // ----------------------------------------------------
 
-        function loadArts() {
+        function loadDrafts() {
             try {
-                // Змінюємо ключ, щоб уникнути конфліктів зі старою структурою
-                const data = localStorage.getItem('morstrix_arts_v3'); 
+                // Використовуємо універсальний ключ для всіх чернеток
+                const data = localStorage.getItem('morstrix_drafts_v1'); 
                 return data ? JSON.parse(data) : {};
             } catch (e) {
                 console.error("Помилка завантаження LocalStorage:", e);
@@ -270,9 +431,9 @@ drafts.html
             }
         }
 
-        function saveArts() {
+        function saveDrafts() {
             try {
-                localStorage.setItem('morstrix_arts_v3', JSON.stringify(allArts));
+                localStorage.setItem('morstrix_drafts_v1', JSON.stringify(allDrafts));
                 if (window.Telegram && window.Telegram.WebApp) {
                     window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
                 }
@@ -285,46 +446,32 @@ drafts.html
         }
         
         // ----------------------------------------------------
-        // 🖼️ ЛОГІКА ПІКСЕЛЬНОГО АРТУ ТА МАЛЮВАННЯ
+        // 🖼️ ЛОГІКА ПІКСЕЛЬНОГО АРТУ
         // ----------------------------------------------------
 
-        function initPixelGrid() {
-            // Ініціалізуємо порожню сітку кольором ластика (чорний фон)
+        function initPixelGrid(artData = null) {
             pixelGrid = Array(ART_GRID_SIZE).fill(0).map(() => 
                 Array(ART_GRID_SIZE).fill(ERASER_COLOR)
             );
-        }
-
-        function loadArt(cellKey) {
-            initPixelGrid(); 
-            const artData = allArts[cellKey]; 
-            
-            if (artData && artData.length === ART_GRID_SIZE && artData[0].length === ART_GRID_SIZE) {
-                pixelGrid = artData;
-            }
-            redrawCanvas();
-        }
-        
-        function saveArt(cellKey) {
-            // Перевіряємо, чи сітка повністю порожня
-            const isBlank = pixelGrid.flat().every(color => color === ERASER_COLOR);
-            
-            if (isBlank) {
-                delete allArts[cellKey];
-            } else {
-                allArts[cellKey] = pixelGrid;
-            }
-            saveArts();
+             if (artData) {
+                // Завантажуємо існуючий арт
+                for(let r=0; r<ART_GRID_SIZE; r++) {
+                    for(let c=0; c<ART_GRID_SIZE; c++) {
+                        if (artData[r] && artData[r][c]) {
+                             pixelGrid[r][c] = artData[r][c];
+                        }
+                    }
+                }
+             }
         }
 
         function redrawCanvas() {
             for (let r = 0; r < ART_GRID_SIZE; r++) {
                 for (let c = 0; c < ART_GRID_SIZE; c++) {
-                    // Заповнюємо клітинку кольором
                     ctx.fillStyle = pixelGrid[r][c] || ERASER_COLOR;
                     ctx.fillRect(c * PIXEL_SIZE, r * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
                     
-                    // Малюємо темно-графітову сітку
+                    // Малюємо сітку
                     ctx.strokeStyle = GRID_COLOR;
                     ctx.lineWidth = 1;
                     ctx.strokeRect(c * PIXEL_SIZE, r * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
@@ -354,19 +501,15 @@ drafts.html
             if (row >= 0 && row < ART_GRID_SIZE && col >= 0 && col < ART_GRID_SIZE) {
                 const targetColor = currentTool === 'brush' ? WHITE_COLOR : ERASER_COLOR;
                 
-                // Якщо клікнули на клітинку з потрібним кольором, нічого не робимо (або перемикаємо)
-                if (pixelGrid[row][col] === targetColor && currentTool === 'brush') {
-                    // Якщо кисть, і клітинка вже біла, перемикаємо на ластик
-                    pixelGrid[row][col] = ERASER_COLOR;
-                } else if (pixelGrid[row][col] === targetColor && currentTool === 'eraser') {
-                    // Якщо ластик, і клітинка вже чорна, нічого не робимо
-                    return;
+                // Якщо клікнули на клітинку з потрібним кольором, інвертуємо
+                if (pixelGrid[row][col] === targetColor) {
+                    pixelGrid[row][col] = currentTool === 'brush' ? ERASER_COLOR : WHITE_COLOR;
                 } else {
                     pixelGrid[row][col] = targetColor;
                 }
                 
                 redrawCanvas();
-                saveArt(currentCellKey); // Автоматичне збереження арту
+                saveDraft(currentCellKey, 'art', pixelGrid); 
                 updateCellDisplay(currentCellKey);
             }
         }
@@ -382,7 +525,6 @@ drafts.html
             if (!isDrawing) return;
             e.preventDefault();
             const { row, col } = getCoords(e);
-            // Використовуємо setImmediate або debounce для оптимізації, але для 8x8 можна і так
             applyTool(row, col);
         }
         
@@ -393,8 +535,8 @@ drafts.html
         function toggleTool() {
             currentTool = currentTool === 'brush' ? 'eraser' : 'brush';
             const toolName = currentTool === 'brush' ? '**КИСТЬ**' : '**ЛАСТИК**';
-            toolIndicator.innerHTML = `ІНСТРУМЕНТ: ${toolName}`;
-            toolNameSpan.textContent = currentTool === 'brush' ? 'ЛАСТИК' : 'КИСТЬ';
+            artToolIndicator.innerHTML = `ІНСТРУМЕНТ: ${toolName}`;
+            artToolNameSpan.textContent = currentTool === 'brush' ? 'ЛАСТИК' : 'КИСТЬ';
             
             if (window.Telegram && window.Telegram.WebApp) {
                 window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
@@ -402,7 +544,7 @@ drafts.html
         }
         
         // ----------------------------------------------------
-        // 🏗️ ГЕНЕРАЦІЯ СІТКИ ТА ЛОГІКА
+        // 🏗️ ГЕНЕРАЦІЯ СІТКИ ТА ЛОГІКА ЧЕРНЕТОК
         // ----------------------------------------------------
 
         function generateGrid() {
@@ -416,85 +558,231 @@ drafts.html
                     
                     cellDiv.addEventListener('click', () => openCell(cellKey, row, col));
                     gridContainer.appendChild(cellDiv);
-                    updateCellDisplay(cellKey); // Оновлюємо, щоб показати існуючий арт
+                    updateCellDisplay(cellKey); 
                 }
             }
         }
 
-        function openCell(cellKey, row, col) {
-            currentCellKey = cellKey;
-            modalTitle.textContent = `АРТ [${row}, ${col}] (8x8)`;
-            
-            loadArt(cellKey); // Завантажуємо арт
-            
-            // Скидаємо інструмент на кисть за замовчуванням
-            currentTool = 'brush';
-            toolIndicator.innerHTML = `ІНСТРУМЕНТ: **КИСТЬ**`;
-            toolNameSpan.textContent = 'ЛАСТИК';
-            
-            artModal.style.display = 'flex';
-            
-            if (window.Telegram && window.Telegram.WebApp) {
-                window.Telegram.WebApp.expand();
-                window.Telegram.WebApp.BackButton.show();
-            }
-        }
-        
         function updateCellDisplay(cellKey) {
             const row = cellKey.split('_')[1];
             const col = cellKey.split('_')[2];
             const currentCellDiv = document.querySelector(`.cell[data-key="${cellKey}"]`);
             if (currentCellDiv) {
-                const hasArt = !!allArts[cellKey];
-
-                let indicator = hasArt ? '🎨' : '';
+                const draft = allDrafts[cellKey];
+                let indicator = '';
                 
-                currentCellDiv.innerHTML = `[${row}, ${col}] ${hasArt ? `<div class="note-indicator">⚡️ ${indicator}</div>` : ''}`;
+                if (draft) {
+                    switch(draft.type) {
+                        case 'note':
+                            indicator = '📝';
+                            break;
+                        case 'art':
+                            indicator = '🎨';
+                            break;
+                        case 'push':
+                            indicator = '⏰';
+                            break;
+                    }
+                }
+
+                currentCellDiv.innerHTML = `[${row}, ${col}] ${indicator ? `<div class="draft-indicator">⚡️ ${indicator}</div>` : ''}`;
             }
         }
-
-        function saveAndClose() {
-             // Збереження вже відбувається в процесі малювання
-            currentCellKey = null;
-            closeModal();
+        
+        function getDraft(cellKey) {
+            return allDrafts[cellKey] || null;
         }
 
-        function closeModal() {
-            artModal.style.display = 'none';
-            currentCellKey = null;
+        function saveDraft(cellKey, type, data) {
+            const isEmpty = (type === 'note' && !data.trim()) || 
+                            (type === 'art' && isArtBlank(data)) || 
+                            (type === 'push' && (!data.text || !data.datetime));
+
+            if (isEmpty) {
+                delete allDrafts[cellKey];
+            } else {
+                allDrafts[cellKey] = { type, data };
+            }
+            saveDrafts();
+            updateCellDisplay(cellKey);
+        }
+
+        function deleteDraft(cellKey) {
+            delete allDrafts[cellKey];
+            saveDrafts();
+            updateCellDisplay(cellKey);
+        }
+        
+        function isArtBlank(grid) {
+             return grid.flat().every(color => color === ERASER_COLOR);
+        }
+
+        function openCell(cellKey, row, col) {
+            currentCellKey = cellKey;
+            const coords = `${row}, ${col}`;
+            const existingDraft = getDraft(cellKey);
+            
+            // Якщо чернетка існує, відкриваємо відповідний редактор
+            if (existingDraft) {
+                switch (existingDraft.type) {
+                    case 'note':
+                        openNoteModal(coords, existingDraft.data);
+                        break;
+                    case 'art':
+                        openArtModal(coords, existingDraft.data);
+                        break;
+                    case 'push':
+                        openPushModal(coords, existingDraft.data);
+                        break;
+                }
+            } else {
+                // Якщо чернетки немає, відкриваємо вікно вибору типу
+                document.getElementById('selectCoords').textContent = coords;
+                selectModal.style.display = 'flex';
+                showBackButton();
+            }
+        }
+        
+        function openNoteModal(coords, text = '') {
+            selectModal.style.display = 'none';
+            document.getElementById('noteCoords').textContent = coords;
+            noteTextarea.value = text;
+            noteModal.style.display = 'flex';
+            showBackButton();
+        }
+
+        function openArtModal(coords, artData = null) {
+            selectModal.style.display = 'none';
+            document.getElementById('artCoords').textContent = coords;
+            
+            initPixelGrid(artData); 
+            redrawCanvas(); 
+            
+            currentTool = 'brush';
+            artToolIndicator.innerHTML = `ІНСТРУМЕНТ: **КИСТЬ**`;
+            artToolNameSpan.textContent = 'ЛАСТИК';
+            
+            artModal.style.display = 'flex';
+            showBackButton();
+        }
+        
+        function openPushModal(coords, pushData = { text: '', datetime: '' }) {
+            selectModal.style.display = 'none';
+            document.getElementById('pushCoords').textContent = coords;
+            pushTextarea.value = pushData.text || '';
+            pushDateTime.value = pushData.datetime || '';
+            pushModal.style.display = 'flex';
+            showBackButton();
+        }
+
+        // --- Закриття та Збереження/Надсилання ---
+        
+        function closeModal(modalElement) {
+            modalElement.style.display = 'none';
+            hideBackButton();
+            // Якщо ми закриваємо редактор, повертаємось до головної сітки
+            if (modalElement !== selectModal) {
+                 // Перевіряємо, чи немає активної чернетки, щоб не відкривати селект знову
+                 if (!getDraft(currentCellKey)) {
+                     currentCellKey = null;
+                 }
+            }
+        }
+        
+        function showBackButton() {
             if (window.Telegram && window.Telegram.WebApp) {
-                 window.Telegram.WebApp.BackButton.hide(); 
+                window.Telegram.WebApp.expand();
+                window.Telegram.WebApp.BackButton.show();
             }
         }
 
-        function sendArt() {
-            if (currentCellKey) {
-                const artData = allArts[currentCellKey];
-                
-                if (!artData) {
-                    alert("У цій кімнаті немає арту для надсилання.");
-                    return;
-                }
-                
-                // Надсилаємо JSON-рядок арту
-                const dataToSend = JSON.stringify(artData);
-                const prefix = `ART_DATA|${currentCellKey}|`;
-                
-                if (window.Telegram && window.Telegram.WebApp) {
-                    window.Telegram.WebApp.sendData(prefix + dataToSend); 
-                    
-                    // Після надсилання видаляємо арт з Local Storage
-                    delete allArts[currentCellKey];
-                    saveArts();
-                    
-                    window.Telegram.WebApp.close();
-                } else {
-                    alert("Помилка: Не вдалося знайти Telegram WebApp API.");
-                }
-                
-                updateCellDisplay(currentCellKey);
+        function hideBackButton() {
+             if (window.Telegram && window.Telegram.WebApp) {
+                window.Telegram.WebApp.BackButton.hide();
             }
         }
+
+        // --- Обробники кнопок ---
+        
+        document.getElementById('cancelSelectBtn').addEventListener('click', () => closeModal(selectModal));
+        
+        document.getElementById('selectNoteBtn').addEventListener('click', () => openNoteModal(document.getElementById('selectCoords').textContent));
+        document.getElementById('selectArtBtn').addEventListener('click', () => openArtModal(document.getElementById('selectCoords').textContent));
+        document.getElementById('selectPushBtn').addEventListener('click', () => openPushModal(document.getElementById('selectCoords').textContent));
+        
+        // NOTE Handlers
+        document.getElementById('saveNoteBtn').addEventListener('click', () => {
+             saveDraft(currentCellKey, 'note', noteTextarea.value);
+             closeModal(noteModal);
+        });
+        document.getElementById('deleteNoteBtn').addEventListener('click', () => {
+             deleteDraft(currentCellKey);
+             closeModal(noteModal);
+        });
+        document.getElementById('closeNoteBtn').addEventListener('click', () => closeModal(noteModal));
+
+        // ART Handlers
+        document.getElementById('clearArtBtn').addEventListener('click', () => {
+             if(confirm("Очистити весь арт?")) {
+                 initPixelGrid();
+                 redrawCanvas();
+                 saveDraft(currentCellKey, 'art', pixelGrid); // Збереження порожнього арту
+             }
+        });
+        document.getElementById('toggleToolBtn').addEventListener('click', toggleTool);
+        document.getElementById('saveArtAndCloseBtn').addEventListener('click', () => closeModal(artModal)); // Збереження вже відбулося при малюванні
+
+        document.getElementById('sendArtBtn').addEventListener('click', () => {
+             const draft = getDraft(currentCellKey);
+             if (!draft || draft.type !== 'art') {
+                 alert("Немає арту для надсилання.");
+                 return;
+             }
+             
+             // Надсилаємо JSON-рядок арту
+             const dataToSend = JSON.stringify(draft.data);
+             const prefix = `ART|${currentCellKey}|`;
+             
+             if (window.Telegram && window.Telegram.WebApp) {
+                 window.Telegram.WebApp.sendData(prefix + dataToSend); 
+                 deleteDraft(currentCellKey); // Видаляємо після надсилання
+                 window.Telegram.WebApp.close();
+             } else {
+                 alert("Помилка: Не вдалося знайти Telegram WebApp API.");
+             }
+        });
+        
+        // PUSH Handlers
+        document.getElementById('schedulePushBtn').addEventListener('click', () => {
+             const text = pushTextarea.value.trim();
+             const datetime = pushDateTime.value;
+             
+             if (!text || !datetime) {
+                 alert("Будь ласка, введіть текст та час.");
+                 return;
+             }
+             
+             const pushData = { text, datetime };
+             saveDraft(currentCellKey, 'push', pushData);
+             
+             // Надсилаємо дані для планування
+             const dataToSend = JSON.stringify(pushData);
+             const prefix = `PUSH|${currentCellKey}|`;
+             
+             if (window.Telegram && window.Telegram.WebApp) {
+                 window.Telegram.WebApp.sendData(prefix + dataToSend); 
+                 deleteDraft(currentCellKey); // Видаляємо після планування
+                 window.Telegram.WebApp.close();
+             } else {
+                 alert("Помилка: Не вдалося знайти Telegram WebApp API.");
+             }
+        });
+        
+        document.getElementById('deletePushBtn').addEventListener('click', () => {
+             deleteDraft(currentCellKey);
+             closeModal(pushModal);
+        });
+        document.getElementById('closePushBtn').addEventListener('click', () => closeModal(pushModal));
 
 
         // ----------------------------------------------------
@@ -505,12 +793,13 @@ drafts.html
             if (window.Telegram && window.Telegram.WebApp) {
                 window.Telegram.WebApp.ready();
                 window.Telegram.WebApp.BackButton.hide();
+                window.Telegram.WebApp.expand();
             }
             generateGrid();
             initPixelGrid(); 
             redrawCanvas(); 
 
-            // Обробники арту (підтримка як миші, так і дотику)
+            // Обробники арту (підтримка миші та дотику)
             canvas.addEventListener('mousedown', handlePointerStart);
             canvas.addEventListener('mousemove', handlePointerMove);
             document.addEventListener('mouseup', handlePointerEnd);
@@ -519,23 +808,21 @@ drafts.html
             canvas.addEventListener('touchmove', handlePointerMove);
             document.addEventListener('touchend', handlePointerEnd);
             
-            clearArtBtn.addEventListener('click', () => {
-                if(confirm("Ви впевнені, що хочете очистити весь арт?")) {
-                    initPixelGrid();
-                    redrawCanvas();
-                    saveArt(currentCellKey);
-                    updateCellDisplay(currentCellKey);
-                }
-            });
-            
-            toggleToolBtn.addEventListener('click', toggleTool);
-
-            // Обробники кнопок
-            saveAndCloseBtn.addEventListener('click', saveAndClose);
-            sendArtBtn.addEventListener('click', sendArt); 
-
+            // Загальна логіка кнопки "Назад"
             if (window.Telegram && window.Telegram.WebApp) {
-                window.Telegram.WebApp.onEvent('backButtonClicked', saveAndClose);
+                window.Telegram.WebApp.onEvent('backButtonClicked', () => {
+                     if (noteModal.style.display === 'flex') {
+                          closeModal(noteModal);
+                     } else if (artModal.style.display === 'flex') {
+                          closeModal(artModal);
+                     } else if (pushModal.style.display === 'flex') {
+                          closeModal(pushModal);
+                     } else if (selectModal.style.display === 'flex') {
+                          closeModal(selectModal);
+                     } else {
+                         window.Telegram.WebApp.close();
+                     }
+                });
             }
         });
     </script>

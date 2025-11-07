@@ -2,6 +2,8 @@
 
 import os
 import re
+import json # ✅ ДОДАНО: Для обробки JSON-даних від Web App
+import datetime # ✅ ДОДАНО: Хоча зараз не використовується, потрібен для Push (нагадувань)
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, ConversationHandler, CallbackContext 
 from telegram.constants import ParseMode
@@ -17,7 +19,50 @@ FONT_TEXT = 0
 if os.getenv("RENDER") != "true":
     load_dotenv()
 
+
+# --- Функція для обробки даних, що надходять від Web App (drafts.html) ---
+async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обробляє дані, що надходять від Web App (наприклад, піксельний арт)."""
+    
+    web_app_data = update.effective_message.web_app_data
+    if not web_app_data:
+        return
+
+    data_string = web_app_data.data
+    user_id = update.effective_user.id
+    
+    parts = data_string.split('|', 2)
+    
+    if len(parts) < 3:
+         await update.effective_message.reply_text("❌ Помилка: Невірний формат даних від Web App.")
+         return
+
+    draft_type, cell_key, json_payload = parts
+    
+    # 1. Обробка ART (Надсилання піксельного арту)
+    if draft_type == 'ART_DATA':
+        try:
+            art_matrix = json.loads(json_payload)
+            
+            # ВІДПОВІДЬ: Надсилаємо підтвердження
+            await update.effective_message.reply_text(
+                f"🎨 Ваш піксельний арт (Ключ: `{cell_key}`) прийнято! \n"
+                f"Розмір сітки: {len(art_matrix)}x{len(art_matrix[0])}.",
+                parse_mode=ParseMode.MARKDOWN
+            )
+        except Exception as e:
+            await update.effective_message.reply_text("❌ Помилка при обробці АРТУ.")
+            print(f"Помилка обробки ART: {e}")
+            
+    # 2. Обробка PUSH/NOTE (якщо цей функціонал буде додано пізніше)
+    elif draft_type == 'NOTE':
+         await update.effective_message.reply_text("📝 Замітка прийнята (функціонал зберігання буде реалізовано).")
+    elif draft_type == 'PUSH':
+         await update.effective_message.reply_text("⏰ Нагадування прийнято (функціонал планування буде реалізовано).")
+
+
 # --- Обробник нових учасників (Автопривітання) ---
+# ... (залишаємо handle_new_members без змін)
 async def handle_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for member in update.message.new_chat_members:
         if not member.is_bot:
@@ -41,6 +86,7 @@ async def handle_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
             )
 
 # --- Обробник запитів на приєднання (Автоприйом заявок + Автосмс) ---
+# ... (залишаємо handle_join_request без змін)
 async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.chat.id
     user_id = update.from_user.id
@@ -60,6 +106,7 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
         print(f"Помилка схвалення запиту на приєднання або відправки автосмс: {e}")
 
 # --- Обробник Callback Query (Inline кнопки для правил) ---
+# ... (залишаємо handle_callback_query без змін)
 async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer() # Завжди відповідаємо на query, щоб прибрати "годинник"
@@ -75,10 +122,12 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
              # Якщо повідомлення занадто старе, просто відправити нове
              await query.message.reply_text(rules_text, parse_mode=ParseMode.MARKDOWN)
 
+
 # ----------------------------------------------------
 #               💥 Обробники Діалогу /font 💥
 # ----------------------------------------------------
 
+# ... (font_start, font_get_text, font_cancel без змін)
 async def font_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обробляє команду /font, починаючи діалог."""
     

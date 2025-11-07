@@ -7,7 +7,8 @@ from telegram.ext import (
     ChatJoinRequestHandler, CallbackQueryHandler, JobQueue,
     ConversationHandler 
 )
-from telegram import Update
+# ✅ ДОДАНО InlineKeyboardButton, InlineKeyboardMarkup для команди /drafts
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup 
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 from dotenv import load_dotenv
@@ -18,6 +19,7 @@ from ai import handle_gemini_message_group, handle_gemini_message_private
 from handlers import (
     handle_new_members, handle_join_request, handle_callback_query,
     font_start, font_get_text, font_cancel,
+    handle_web_app_data, # ✅ ІМПОРТУЄМО обробник Web App
 )
 from safe import check_links 
 
@@ -41,11 +43,11 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "ᴡᴇʟᴄᴏᴍᴇ \n\n"
         "фунᴋціᴏнᴀʌ:\n"
         "➞ /font - ᴛᴇᴋᴄᴛ ᴄᴛᴀйʌᴇᴘ \n"
+        "➞ /drafts - ʜᴏᴛᴇ/ᴀʀᴛ/ᴘᴜꜱʜ \n" # ✅ Оновлено опис
         "➞ ᴀʙᴛᴏпᴘийᴏᴍ зᴀяʙᴏᴋ\n"
         "➞ пᴇᴘᴇʙіᴘᴋᴀ пᴏᴄиʌᴀнь\n\n"
         "➞ ШІ — дʌя чʌᴇніʙ ᴋʌубу.\n"
-        "ᴛᴘигᴇᴘ ᴀʌᴏ у гᴘʏпі.\n\n"
-        "➞ ʜᴇʟᴘᴇʀ: ɴᴏᴛᴇ/ᴀʀᴛ/ᴘᴜꜱʜ",
+        "ᴛᴘигᴇᴘ ᴀʌᴏ у гᴘʏпі.\n",
         parse_mode=ParseMode.MARKDOWN
     )
 
@@ -56,9 +58,30 @@ application = Application.builder().token(TELEGRAM_BOT_TOKEN).job_queue(job_queu
 # 🆕 СТАНИ ДЛЯ FONT_HANDLER
 FONT_START, FONT_GET_TEXT = range(2)
 
+# ----------------------------------------------------
+#               ФУНКЦІЯ ДЛЯ /drafts
+# ----------------------------------------------------
+
+async def drafts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Відкриває Web App з чернетками (drafts)."""
+    
+    # URL до файлу drafts.html
+    web_app_url = f"{RENDER_EXTERNAL_URL.rstrip('/')}/drafts.html" if RENDER_EXTERNAL_URL else "https://example.com/drafts.html"
+    
+    # Кнопка для відкриття Web App
+    keyboard = [[InlineKeyboardButton("📝 Відкрити Art Helper", web_app={"url": web_app_url})]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        "📝 **MORSTRIX ART HELPER** \nСтворюй піксельний арт, замітки та нагадування.",
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.MARKDOWN
+    )
+
 
 # Регистрация Обработчиков
 application.add_handler(CommandHandler("start", start_command))
+application.add_handler(CommandHandler("drafts", drafts_command)) # ✅ ДОДАНО: Обробник команди /drafts
 
 # 💥 FONT CONVERSATION HANDLER 💥
 font_conv_handler = ConversationHandler(
@@ -77,6 +100,9 @@ application.add_handler(font_conv_handler)
 application.add_handler(CallbackQueryHandler(handle_callback_query)) 
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members))
 application.add_handler(ChatJoinRequestHandler(handle_join_request))
+
+# ✅ ДОДАНО: Обробник для даних, що надходять від Web App
+application.add_handler(MessageHandler(filters.UpdateType.WEB_APP_DATA, handle_web_app_data)) 
 
 # Обработчики Gemini (ІІ з перевіркою)
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_gemini_message_private))
@@ -99,6 +125,10 @@ async def start_webhook_server(application: Application):
     
     # 1. Настройка aiohttp
     app = web.Application()
+    
+    # ✅ ДОДАНО: Обробник для статичного файлу drafts.html
+    # Припускаємо, що drafts.html лежить у корені (./) і доступний через /drafts.html
+    app.router.add_static('/', path='./', name='static_files', follow_symlinks=True) 
 
     # 2. Добавляем Webhook Telegram
     webhook_path = f'/{TELEGRAM_BOT_TOKEN}'
@@ -162,6 +192,7 @@ def main():
     if os.getenv("RENDER") == "true":
         print("Запуск в режиме Webhook (Render)...")
         # Запускаем асинхронный сервер
+        application.job_queue.start() # ✅ ЗАПУСКАЄМО JobQueue
         asyncio.run(start_webhook_server(application))
     else:
         print("Запуск бота в режиме опроса (Polling).")
