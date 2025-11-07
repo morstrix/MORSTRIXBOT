@@ -1,3 +1,5 @@
+# handlers.py
+
 import os
 import re
 import json
@@ -125,7 +127,8 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
     await query.answer()
     
     data = query.data
-    user_id = query.from_user.id
+    # Змінна user_id визначена тут
+    user_id = query.from_user.id 
     
     # Регулярний вираз для парсингу команд: view_note:<id> або delete_note:<id>
     note_match = re.match(r'(view|delete)_note:([a-f0-9-]+)', data)
@@ -227,7 +230,8 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
                 await query.edit_message_text("Нотатку не знайдено.")
         
         elif action == 'delete':
-            if _delete_note(user_id, note_id):
+            # ОНОВЛЕНО: Використовуємо user_id замість user.id
+            if _delete_note(user_id, note_id): 
                 await query.edit_message_text("✅ Нотатку видалено.")
                 # Повертаємо до списку нотаток
                 await context.application.create_task(handle_callback_query(update, context))
@@ -356,6 +360,7 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not update.message.web_app_data:
         return
 
+    # Змінна user визначена тут
     user = update.effective_user
     chat_id = update.effective_chat.id
     
@@ -431,20 +436,24 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 # --- Обробник команди /font ---
 
-# Словник для заміни кириличних та латинських символів
+# Словник для заміни кириличних та латинських символів на Small Caps або схожі символи
 FONT_MAP = {
-    # Кириличні
+    # Кириличні (використовуємо символи з фонетичних та латинських блоків, схожі за виглядом)
     'А': 'ᴀ', 'а': 'ᴀ',
-    'В': 'ʙ', 'в': 'ʙ',
+    'В': 'в', 'в': 'ʙ', # немає гарного Small Caps
     'Е': 'ᴇ', 'е': 'ᴇ',
     'К': 'ᴋ', 'к': 'ᴋ',
     'М': 'ᴍ', 'м': 'ᴍ',
     'О': 'ᴏ', 'о': 'ᴏ',
     'Р': 'ᴘ', 'р': 'ᴘ',
     'С': 'ᴄ', 'с': 'ᴄ',
-    'Л': 'ʌ', 'л': 'ʌ',
+    'Т': 'т', 'т': 'ᴛ',
+    'Н': 'н', 'н': 'н',
+    'І': 'і', 'і': 'і',
+    'У': 'у', 'у': 'ʏ',
+    'Л': 'л', 'л': 'ʌ',
     
-    # Латинські (згідно із запитом)
+    # Латинські (Small Caps Unicode)
     'A': 'ᴀ', 'a': 'ᴀ',
     'B': 'ʙ', 'b': 'ʙ',
     'C': 'ᴄ', 'c': 'ᴄ',
@@ -456,30 +465,39 @@ FONT_MAP = {
     'I': 'ɪ', 'i': 'ɪ',
     'J': 'ᴊ', 'j': 'ᴊ',
     'K': 'ᴋ', 'k': 'ᴋ',
-    'L': 'ʟ', 'l': 'ʌ', # Замінюємо 'l' на 'ʌ' як у прикладі для 'Л/л'
+    'L': 'ʟ', 'l': 'ʟ', 
     'M': 'ᴍ', 'm': 'ᴍ',
     'N': 'ɴ', 'n': 'ɴ',
     'O': 'ᴏ', 'o': 'ᴏ',
     'P': 'ᴘ', 'p': 'ᴘ',
-    'Q': 'ǫ', 'q': 'ǫ',
+    'Q': 'ǫ', 'q': 'ǫ', # Схожий символ
     'R': 'ʀ', 'r': 'ʀ',
-    'S': 'ꜱ', 's': 'ᴄ', # Замінюємо 's' на 'ᴄ' як у прикладі для 'С/с'
+    'S': 'ꜱ', 's': 'ꜱ',
     'T': 'ᴛ', 't': 'ᴛ',
     'U': 'ᴜ', 'u': 'ᴜ',
     'V': 'ᴠ', 'v': 'ᴠ',
     'W': 'ᴡ', 'w': 'ᴡ',
-    'X': 'x', 'x': 'x', # залишаємо як є
+    'X': 'x', 'x': 'x', 
     'Y': 'ʏ', 'y': 'ʏ',
     'Z': 'ᴢ', 'z': 'ᴢ',
 }
 
 def convert_text_to_font(text: str) -> str:
     """Замінює символи у тексті відповідно до FONT_MAP."""
-    converted_text = ""
+    
+    final_converted_text = ""
     for char in text:
-        # Використовуємо .get() для залишення символу без змін, якщо він не знайдений у словнику
-        converted_text += FONT_MAP.get(char, char)
-    return converted_text
+        # Перевіряємо велику літеру
+        if char in FONT_MAP:
+            final_converted_text += FONT_MAP[char]
+        # Перевіряємо малу літеру, якщо її великий варіант є у FONT_MAP
+        elif char.upper() in FONT_MAP:
+            # Використовуємо Small Caps варіант відповідної великої літери
+            final_converted_text += FONT_MAP[char.upper()]
+        else:
+            final_converted_text += char
+            
+    return final_converted_text
 
 
 async def font_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -487,14 +505,18 @@ async def font_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # 1. Визначення тексту для перетворення
     text_to_convert = None
+    reply_to_message_id = None
     
     # Сценарій: Текст після команди /font
     if context.args:
         text_to_convert = " ".join(context.args)
+        # Якщо в команді є аргументи, не відповідаємо на повідомлення
+        reply_to_message_id = None 
     
     # Сценарій: Відповідь на інше повідомлення
     elif update.message.reply_to_message and update.message.reply_to_message.text:
         text_to_convert = update.message.reply_to_message.text
+        reply_to_message_id = update.message.reply_to_message.message_id
         
     if not text_to_convert:
         await update.message.reply_text(
@@ -510,5 +532,5 @@ async def font_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         converted_text,
         # Відповідаємо на оригінальне повідомлення, якщо це була відповідь
-        reply_to_message_id=update.message.reply_to_message.message_id if update.message.reply_to_message else None
+        reply_to_message_id=reply_to_message_id 
     )

@@ -17,7 +17,7 @@ from flask import Flask, request, render_template, send_file
 from ai import handle_gemini_message_group, handle_gemini_message_private
 from handlers import (
     handle_new_members, handle_join_request, handle_callback_query,
-    open_drafts_webapp, handle_webapp_data
+    open_drafts_webapp, handle_webapp_data, font_command # ОНОВЛЕНО: Додано font_command
 )
 # Видалено імпорти: from weather import weather_command, from translator import ...
 
@@ -52,6 +52,7 @@ application = Application.builder().token(TELEGRAM_BOT_TOKEN).job_queue(job_queu
 application.add_handler(CommandHandler("start", start_command))
 # Видалено: application.add_handler(CommandHandler("weather", weather_command, filters.ChatType.GROUPS | filters.ChatType.PRIVATE))
 application.add_handler(CommandHandler("drafts", open_drafts_webapp, filters.ChatType.PRIVATE))
+application.add_handler(CommandHandler("font", font_command, filters.TEXT & (filters.ChatType.GROUPS | filters.ChatType.PRIVATE))) # ОНОВЛЕНО: Додано обробник /font
 
 application.add_handler(CallbackQueryHandler(handle_callback_query)) # Виправлено: обробляє всі callback, не тільки 'show_rules'
 
