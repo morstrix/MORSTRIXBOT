@@ -8,7 +8,7 @@ import base64
 import io
 from uuid import uuid4
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, InputFile, PhotoSize
-from telegram.ext import ContextTypes
+from telegram.ext import ContextTypes, ConversationHandler # ОНОВЛЕНО: Додано ConversationHandler
 from telegram.constants import ChatType
 from dotenv import load_dotenv
 
@@ -20,6 +20,9 @@ if os.getenv("RENDER") != "true":
     load_dotenv()
 
 RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL")
+
+# Стан для ConversationHandler команди /font
+FONT_STATE = 1 
 
 # --- Допоміжні функції для роботи з даними ---
 
@@ -390,7 +393,8 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 if reminder_iso:
                     try:
                         # Парсимо час у UTC
-                        reminder_time_utc = datetime.datetime.fromisoformat(reminder_iso.replace('Z', '+00:00'))
+                        # ВИПРАВЛЕНО: Явно встановлюємо aware datetime для надійності
+                        reminder_time_utc = datetime.datetime.fromisoformat(reminder_iso.replace('Z', '+00:00')).astimezone(datetime.timezone.utc)
                         
                         # Перевіряємо, чи час у майбутньому
                         if reminder_time_utc > datetime.datetime.now(datetime.timezone.utc):
@@ -434,7 +438,7 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
         print(f"Помилка в handle_webapp_data: {e}")
         await update.message.reply_text(f"Сталася помилка: {e}")
 
-# --- Обробник команди /font ---
+# --- Обробник команди /font (НОВА ЛОГІКА) ---
 
 # Словник для заміни кириличних та латинських символів на Small Caps або схожі символи
 FONT_MAP = {
@@ -500,37 +504,52 @@ def convert_text_to_font(text: str) -> str:
     return final_converted_text
 
 
-async def font_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обробляє команду /font, перетворюючи наступний текст або текст у відповіді."""
+async def font_start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Починає розмову для команди /font і просить надіслати текст."""
     
-    # 1. Визначення тексту для перетворення
-    text_to_convert = None
-    reply_to_message_id = None
-    
-    # Сценарій: Текст після команди /font
+    # Сценарій: Текст після команди /font (зберігаємо для зручності)
     if context.args:
         text_to_convert = " ".join(context.args)
-        # Якщо в команді є аргументи, не відповідаємо на повідомлення
-        reply_to_message_id = None 
-    
-    # Сценарій: Відповідь на інше повідомлення
-    elif update.message.reply_to_message and update.message.reply_to_message.text:
-        text_to_convert = update.message.reply_to_message.text
-        reply_to_message_id = update.message.reply_to_message.message_id
+        converted_text = convert_text_to_font(text_to_convert)
+        await update.message.reply_text(converted_text)
+        return ConversationHandler.END # Завершуємо розмову
         
-    if not text_to_convert:
-        await update.message.reply_text(
-            "Надішліть команду `/font <текст>` або `/font`, відповідаючи на повідомлення, щоб змінити шрифт.",
-            parse_mode='Markdown'
-        )
-        return
+    # Сценарій: Тільки команда /font - переходимо до стану очікування тексту
+    
+    await update.message.reply_text(
+        "Надішліть текст, який ви бажаєте перетворити на інший шрифт."
+    )
+    
+    return FONT_STATE # Переходимо до стану очікування тексту
 
-    # 2. Перетворення тексту
+async def font_receive_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Отримує текст від користувача, перетворює його і завершує розмову."""
+    
+    text_to_convert = update.message.text
+    
+    if not text_to_convert:
+        # Якщо прийшло не текстове повідомлення (наприклад, фото)
+        await update.message.reply_text("Це не схоже на текст. Будь ласка, спробуйте знову, надіславши команду `/font`.")
+        return ConversationHandler.END # Завершуємо розмову
+        
+    # 1. Перетворення тексту
     converted_text = convert_text_to_font(text_to_convert)
 
-    # 3. Надсилання результату
+    # 2. Надсилання результату
     await update.message.reply_text(
         converted_text,
-        # Відповідаємо на оригінальне повідомлення, якщо це була відповідь
-        reply_to_message_id=reply_to_message_id 
+        # Відповідаємо на оригінальне повідомлення користувача (на те, що він щойно надіслав)
+        reply_to_message_id=update.message.message_id 
     )
+    
+    # 3. Завершення розмови
+    return ConversationHandler.END
+
+async def font_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Завершує розмову, якщо користувач надіслав /cancel або іншу команду."""
+    await update.message.reply_text(
+        'Операцію змінення шрифту скасовано.'
+    )
+    return ConversationHandler.END
+
+# Видалено: font_command (стара функція)
