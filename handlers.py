@@ -428,3 +428,87 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
     except Exception as e:
         print(f"Помилка в handle_webapp_data: {e}")
         await update.message.reply_text(f"Сталася помилка: {e}")
+
+# --- Обробник команди /font ---
+
+# Словник для заміни кириличних та латинських символів
+FONT_MAP = {
+    # Кириличні
+    'А': 'ᴀ', 'а': 'ᴀ',
+    'В': 'ʙ', 'в': 'ʙ',
+    'Е': 'ᴇ', 'е': 'ᴇ',
+    'К': 'ᴋ', 'к': 'ᴋ',
+    'М': 'ᴍ', 'м': 'ᴍ',
+    'О': 'ᴏ', 'о': 'ᴏ',
+    'Р': 'ᴘ', 'р': 'ᴘ',
+    'С': 'ᴄ', 'с': 'ᴄ',
+    'Л': 'ʌ', 'л': 'ʌ',
+    
+    # Латинські (згідно із запитом)
+    'A': 'ᴀ', 'a': 'ᴀ',
+    'B': 'ʙ', 'b': 'ʙ',
+    'C': 'ᴄ', 'c': 'ᴄ',
+    'D': 'ᴅ', 'd': 'ᴅ',
+    'E': 'ᴇ', 'e': 'ᴇ',
+    'F': 'ꜰ', 'f': 'ꜰ',
+    'G': 'ɢ', 'g': 'ɢ',
+    'H': 'ʜ', 'h': 'ʜ',
+    'I': 'ɪ', 'i': 'ɪ',
+    'J': 'ᴊ', 'j': 'ᴊ',
+    'K': 'ᴋ', 'k': 'ᴋ',
+    'L': 'ʟ', 'l': 'ʌ', # Замінюємо 'l' на 'ʌ' як у прикладі для 'Л/л'
+    'M': 'ᴍ', 'm': 'ᴍ',
+    'N': 'ɴ', 'n': 'ɴ',
+    'O': 'ᴏ', 'o': 'ᴏ',
+    'P': 'ᴘ', 'p': 'ᴘ',
+    'Q': 'ǫ', 'q': 'ǫ',
+    'R': 'ʀ', 'r': 'ʀ',
+    'S': 'ꜱ', 's': 'ᴄ', # Замінюємо 's' на 'ᴄ' як у прикладі для 'С/с'
+    'T': 'ᴛ', 't': 'ᴛ',
+    'U': 'ᴜ', 'u': 'ᴜ',
+    'V': 'ᴠ', 'v': 'ᴠ',
+    'W': 'ᴡ', 'w': 'ᴡ',
+    'X': 'x', 'x': 'x', # залишаємо як є
+    'Y': 'ʏ', 'y': 'ʏ',
+    'Z': 'ᴢ', 'z': 'ᴢ',
+}
+
+def convert_text_to_font(text: str) -> str:
+    """Замінює символи у тексті відповідно до FONT_MAP."""
+    converted_text = ""
+    for char in text:
+        # Використовуємо .get() для залишення символу без змін, якщо він не знайдений у словнику
+        converted_text += FONT_MAP.get(char, char)
+    return converted_text
+
+
+async def font_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обробляє команду /font, перетворюючи наступний текст або текст у відповіді."""
+    
+    # 1. Визначення тексту для перетворення
+    text_to_convert = None
+    
+    # Сценарій: Текст після команди /font
+    if context.args:
+        text_to_convert = " ".join(context.args)
+    
+    # Сценарій: Відповідь на інше повідомлення
+    elif update.message.reply_to_message and update.message.reply_to_message.text:
+        text_to_convert = update.message.reply_to_message.text
+        
+    if not text_to_convert:
+        await update.message.reply_text(
+            "Надішліть команду `/font <текст>` або `/font`, відповідаючи на повідомлення, щоб змінити шрифт.",
+            parse_mode='Markdown'
+        )
+        return
+
+    # 2. Перетворення тексту
+    converted_text = convert_text_to_font(text_to_convert)
+
+    # 3. Надсилання результату
+    await update.message.reply_text(
+        converted_text,
+        # Відповідаємо на оригінальне повідомлення, якщо це була відповідь
+        reply_to_message_id=update.message.reply_to_message.message_id if update.message.reply_to_message else None
+    )
