@@ -63,13 +63,12 @@ application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, ha
 application.add_handler(ChatJoinRequestHandler(handle_join_request))
 
 # =================================================================
-# === 💥 ОСЬ ВИПРАВЛЕННЯ 💥 ===
+# === 💥 ОСЬ ФІНАЛЬНЕ ВИПРАВЛЕННЯ 💥 ===
 #
-# Помилка була "filters.FROM_WEBAPP".
-# Правильний фільтр: "filters.WEB_APP_DATA"
+# Правильний фільтр: "filters.Message.WEB_APP_DATA"
 # =================================================================
 application.add_handler(MessageHandler(
-    filters.WEB_APP_DATA,
+    filters.Message.WEB_APP_DATA,
     handle_webapp_data
 ))
 
