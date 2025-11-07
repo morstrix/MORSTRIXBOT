@@ -1,304 +1,225 @@
-<!DOCTYPE html>
-<html lang="uk">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Чернетки | Drafts</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+import os
+import re
+import json
+import datetime
+import base64
+import io
+from uuid import uuid4
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from telegram.ext import ContextTypes
+from telegram.constants import ChatType, ParseMode
+from PIL import Image
+from dotenv import load_dotenv
+
+# Завантажуємо змінні оточення для використання в хендлерах, якщо потрібно
+if os.getenv("RENDER") != "true":
+    load_dotenv()
+
+RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL")
+
+# --- Обробник нових учасників ---
+async def handle_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    for member in update.message.new_chat_members:
+        if not member.is_bot:
+            
+            # Кнопка для правил
+            keyboard = [[InlineKeyboardButton("Показати Правила", callback_data="show_rules")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            welcome_message = (
+                f"Привіт, {member.full_name}! 👋\n"
+                f"Ласкаво просимо до нашої спільноти. \n"
+                f"Будь ласка, ознайомтеся з правилами."
+            )
+            
+            # Перевіряємо, чи це група з темами (форум)
+            thread_id = update.message.message_thread_id if update.message.is_topic_message else None
+
+            await update.message.reply_text(
+                welcome_message,
+                reply_markup=reply_markup,
+                message_thread_id=thread_id
+            )
+
+# --- Обробник запитів на приєднання ---
+async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Приклад: автоматичне прийняття запиту
+    chat_id = update.chat.id
+    user_id = update.from_user.id
+    try:
+        await context.bot.approve_chat_join_request(chat_id=chat_id, user_id=user_id)
+        # Можна відправити привітання
+        # await context.bot.send_message(user_id, "Ваш запит на приєднання до чату схвалено!")
+    except Exception as e:
+        print(f"Помилка схвалення запиту на приєднання: {e}")
+
+# --- Обробник Callback Query (Inline кнопки) ---
+async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer() # Завжди відповідаємо на query, щоб прибрати "годинник"
+
+    if query.data == "show_rules":
+        # Відредагувати повідомлення, щоб показати правила
+        rules_text = (
+            "📜 **Правила Чату:**\n"
+            "1. Поважайте інших учасників.\n"
+            "2. Не спамте і не флудьте.\n"
+            "3. Заборонено образи та дискримінація.\n"
+            "4. Всі посилання перевіряються системою Safe Browsing.\n"
+            "5. Дотримуйтесь загальних правил Telegram.\n"
+        )
+        try:
+             await query.edit_message_text(text=rules_text, parse_mode=ParseMode.MARKDOWN)
+        except Exception:
+             # Якщо повідомлення занадто старе, просто відправити нове
+             await query.message.reply_text(rules_text, parse_mode=ParseMode.MARKDOWN)
+
+# --- Drafts Web App ---
+
+async def open_drafts_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обробляє команду /drafts, відкриваючи Web App."""
+    if not RENDER_EXTERNAL_URL:
+        await update.message.reply_text("Помилка: RENDER_EXTERNAL_URL не встановлено.")
+        return
+        
+    # Створюємо URL для Web App
+    webapp_url = f"{RENDER_EXTERNAL_URL.rstrip('/')}/drafts"
     
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    keyboard = [[InlineKeyboardButton("✏️ Відкрити Чернетки", web_app=WebAppInfo(url=webapp_url))]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        "Натисніть кнопку, щоб відкрити персональну сітку чернеток:",
+        reply_markup=reply_markup,
+        message_thread_id=update.message.message_thread_id
+    )
+
+# --- Job для Нагадувань ---
+
+async def send_reminder_job(context: ContextTypes.DEFAULT_TYPE):
+    """Надсилає нагадування користувачу."""
+    job = context.job
+    chat_id = job.data.get('chat_id')
+    text = job.data.get('text')
     
-    <style>
-        :root {
-            --pixel-font: 'Press Start 2P', cursive;
-            --main-font: 'Roboto Mono', monospace;
-            --bg-color: #000000;
-            --main-color: #0F0; /* Зелений */
-            --frame-color: #303030; /* Темно-сірий для рамок */
-            --graphite-frame: #505050; /* Графітовий фрейм для арту */
-            --white-color: #FFFFFF;
-            --input-bg: #111;
-            --input-border: #0F0;
-        }
-
-        body {
-            font-family: var(--main-font);
-            background-color: var(--bg-color);
-            color: var(--main-color);
-            margin: 0;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 20px;
-            overflow-y: auto;
-            padding-bottom: 100px; /* Залишаємо місце для кнопки Telegram */
-        }
-
-        .section-header {
-            font-family: var(--pixel-font);
-            font-size: 14px;
-            color: var(--white-color);
-            text-shadow: 0 0 5px var(--main-color);
-            margin-bottom: 10px;
-            text-align: center;
-        }
-
-        /* --- Input Styles --- */
-        textarea, input[type="datetime-local"] {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid var(--input-border);
-            background-color: var(--input-bg);
-            color: var(--main-color);
-            font-family: var(--main-font);
-            box-sizing: border-box;
-            resize: vertical;
-        }
-
-        /* --- Note Section --- */
-        .note-container {
-            width: 100%;
-            max-width: 400px;
-        }
-        .note-field {
-            margin-bottom: 15px;
-            border: 1px solid var(--graphite-frame);
-            padding: 10px;
-            background-color: var(--input-bg);
-        }
-        .note-field label {
-            display: block;
-            margin-bottom: 5px;
-            color: var(--main-color);
-            font-size: 12px;
-        }
-        .note-field input[type="datetime-local"] {
-            margin-top: 5px;
-            font-size: 14px;
-        }
-
-        /* --- Canvas Section --- */
-        #drawing-area {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            max-width: 400px;
-            width: 100%;
-        }
-
-        #pixel-canvas {
-            border: 3px solid var(--graphite-frame);
-            background-color: var(--frame-color);
-            image-rendering: pixelated;
-            touch-action: none; /* Відключаємо типову поведінку тачскріна */
-        }
-
-        .controls {
-            display: flex;
-            gap: 10px;
-            margin-top: 10px;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-
-        .controls button {
-            background-color: var(--main-color);
-            color: var(--bg-color);
-            border: none;
-            padding: 8px 12px;
-            font-family: var(--main-font);
-            font-weight: bold;
-            cursor: pointer;
-            text-transform: uppercase;
-        }
+    # Використовуємо MarkdownV2 для виділення тексту
+    try:
+        # Екранування тексту для MarkdownV2
+        escaped_text = re.sub(r'([_*\[\]()~`>#+\-=|{}.!])', r'\\\1', text)
         
-        .color-preview {
-            width: 20px;
-            height: 20px;
-            border: 2px solid var(--white-color);
-            display: inline-block;
-            vertical-align: middle;
-            margin-left: 5px;
-        }
+        await context.bot.send_message(
+            chat_id=chat_id, 
+            text=f"⏰ **НАГАДУВАННЯ:**\\n\\n`{escaped_text}`", 
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+    except Exception as e:
+        print(f"Помилка відправки нагадування {chat_id}: {e}")
 
-    </style>
-</head>
-<body>
+# --- Обробка Web App Data ---
 
-    <div class="note-container">
-        <div class="section-header">Замітка та Нагадування</div>
-        <div class="note-field">
-            <label for="note-text">Текст замітки (збережеться як чернетка)</label>
-            <textarea id="note-text" rows="5" placeholder="Введіть текст замітки..."></textarea>
-        </div>
-        <div class="note-field">
-            <label for="reminder-time">Нагадати (UTC час)</label>
-            <input type="datetime-local" id="reminder-time">
-        </div>
-    </div>
-
-    <div id="drawing-area">
-        <div class="section-header">Pixel Art (16x16)</div>
-        <canvas id="pixel-canvas" width="256" height="256"></canvas>
-        <div class="controls">
-            <button id="clear-canvas">Очистити</button>
-            <input type="color" id="color-picker" value="#FFFFFF">
-            <span style="color: var(--white-color); font-size: 12px; line-height: 24px;">Колір</span>
-        </div>
-    </div>
-
-    <script>
-        const tg = window.Telegram.WebApp;
+async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обробляє JSON дані, отримані з Web App (drafts.html)."""
+    
+    user_data_string = update.message.web_app_data.data
+    chat_id = update.effective_chat.id
+    user = update.effective_user
+    job_queue = context.application.job_queue # Отримуємо job_queue з context
+    
+    notes_saved = 0
+    arts_saved = 0
+    reminders_set = 0
+    
+    try:
+        data = json.loads(user_data_string)
         
-        // ===================================
-        // === НАЛАШТУВАННЯ CANVAS ===
-        // ===================================
-        const canvas = document.getElementById('pixel-canvas');
-        const ctx = canvas.getContext('2d');
-        const colorPicker = document.getElementById('color-picker');
-        const clearButton = document.getElementById('clear-canvas');
-        
-        const GRID_SIZE = 16;
-        const PIXEL_SIZE = canvas.width / GRID_SIZE; // 256 / 16 = 16
-        
-        let currentColor = colorPicker.value;
-        let isDrawing = false;
-
-        function initCanvas() {
-            // Заповнення фоном
-            ctx.fillStyle = '#111';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // Налаштування для піксельного малювання
-            ctx.imageSmoothingEnabled = false;
-        }
-
-        function getCanvasPosition(e) {
-            const rect = canvas.getBoundingClientRect();
-            let clientX, clientY;
-
-            if (e.touches && e.touches.length > 0) {
-                clientX = e.touches[0].clientX;
-                clientY = e.touches[0].clientY;
-            } else {
-                clientX = e.clientX;
-                clientY = e.clientY;
-            }
-
-            return {
-                x: clientX - rect.left,
-                y: clientY - rect.top
-            };
-        }
-
-        function drawPixel(x, y) {
-            // Перетворення координат миші/дотику в координати піксельної сітки
-            const gridX = Math.floor(x / PIXEL_SIZE);
-            const gridY = Math.floor(y / PIXEL_SIZE);
-
-            if (gridX >= 0 && gridX < GRID_SIZE && gridY >= 0 && gridY < GRID_SIZE) {
-                ctx.fillStyle = currentColor;
-                ctx.fillRect(gridX * PIXEL_SIZE, gridY * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
-            }
-        }
-        
-        function draw(e) {
-            if (!isDrawing) return;
-            const pos = getCanvasPosition(e);
-            drawPixel(pos.x, pos.y);
-            e.preventDefault(); // Запобігає прокручуванню на мобільних
-        }
-
-        // Обробники подій для малювання
-        canvas.addEventListener('mousedown', (e) => { isDrawing = true; draw(e); });
-        canvas.addEventListener('mousemove', draw);
-        canvas.addEventListener('mouseup', () => { isDrawing = false; });
-        canvas.addEventListener('mouseleave', () => { isDrawing = false; });
-        
-        // Для мобільних
-        canvas.addEventListener('touchstart', (e) => { isDrawing = true; draw(e); }, { passive: false });
-        canvas.addEventListener('touchmove', draw, { passive: false });
-        canvas.addEventListener('touchend', () => { isDrawing = false; });
-
-        // Обробник зміни кольору
-        colorPicker.addEventListener('input', (e) => {
-            currentColor = e.target.value;
-        });
-
-        // Обробник очищення
-        clearButton.addEventListener('click', initCanvas);
-
-        // ===================================
-        // === ВІДПРАВКА ДАНИХ БОТУ ===
-        // ===================================
-        
-        function initApp() {
-            tg.ready();
-            tg.MainButton.setText("ЗБЕРЕГТИ ЧЕРНЕТКИ");
-            tg.MainButton.show();
-            initCanvas(); // Ініціалізуємо полотно
-            
-            // Встановлюємо мінімальний час для нагадування (поточний час)
-            const now = new Date();
-            const offset = now.getTimezoneOffset() * 60000;
-            const localISOTime = (new Date(now - offset)).toISOString().slice(0, 16);
-            document.getElementById('reminder-time').min = localISOTime;
-        }
-
-        tg.onEvent('mainButtonClicked', function() {
-            const dataToSend = {
-                notes: [],
-                arts: []
-            };
-            
-            // 1. Обробка Нотатки та Нагадування
-            const noteText = document.getElementById('note-text').value.trim();
-            const reminderTimeLocal = document.getElementById('reminder-time').value;
-
-            if (noteText) {
-                const noteData = {
-                    text: noteText,
-                    reminder: null
-                };
+        # 1. Обробка Нотаток/Нагадувань
+        if 'notes' in data and isinstance(data['notes'], list):
+            for item in data['notes']:
+                text = item.get('text', '').strip()
+                reminder = item.get('reminder') # ISO 8601 UTC string
                 
-                if (reminderTimeLocal) {
-                    // Конвертуємо локальний час у ISO 8601 UTC (додаємо 'Z')
-                    const date = new Date(reminderTimeLocal);
-                    if (!isNaN(date)) {
-                        noteData.reminder = date.toISOString();
-                    }
-                }
+                if text:
+                    notes_saved += 1
+                    
+                    # 2. Обробка Нагадувань
+                    if reminder:
+                        try:
+                            # Перетворення ISO UTC на об'єкт datetime
+                            reminder_time_utc = datetime.datetime.fromisoformat(reminder.replace('Z', '+00:00'))
+                            
+                            # Перевіряємо, чи час у майбутньому
+                            if reminder_time_utc > datetime.datetime.now(datetime.timezone.utc):
+                                
+                                # Створюємо унікальне ім'я для завдання
+                                job_name = f"reminder_user_{user.id}_{uuid4()}"
+                                
+                                # Плануємо завдання
+                                job_queue.run_once(
+                                    send_reminder_job,
+                                    reminder_time_utc, # Час у UTC
+                                    data={'chat_id': chat_id, 'text': text},
+                                    name=job_name
+                                )
+                                reminders_set += 1
+                            
+                        except (ValueError, TypeError) as e:
+                            print(f"Помилка парсингу часу нагадування: {e}")
+
+        # 3. Обробка Артів
+        if 'arts' in data and isinstance(data['arts'], list):
+            for item in data['arts']:
+                base64_image = item.get('image')
                 
-                dataToSend.notes.push(noteData);
-            }
+                if base64_image:
+                    try:
+                        # Декодуємо Base64
+                        image_data = base64.b64decode(base64_image)
+                        image_stream = io.BytesIO(image_data)
+                        
+                        # Перевірка (опціонально): чи це дійсно зображення
+                        Image.open(image_stream) 
+                        
+                        # Відправляємо як фото
+                        image_stream.seek(0)
+                        await context.bot.send_photo(
+                            chat_id=chat_id,
+                            photo=image_stream,
+                            caption="🖼️ Збережений Pixel Art",
+                        )
+                        arts_saved += 1
+                        
+                    except Exception as e:
+                        print(f"Помилка обробки або відправки арту: {e}")
 
-            // 2. Обробка Піксель Арту
-            // Отримуємо Base64 рядок зображення без префікса "data:image/png;base64,"
-            const imageDataURL = canvas.toDataURL('image/png');
-            const base64Image = imageDataURL.split(',')[1];
-            
-            // Перевіряємо, чи полотно не порожнє (хоча б один піксель відрізняється від фону #111)
-            // Оскільки ми не можемо легко визначити, чи полотно "порожнє" після заливки фоном,
-            // відправляємо його завжди, якщо користувач натиснув "Зберегти"
-            // Альтернативно, можна перевірити, чи картинка відрізняється від пустої, але це складніше.
-            // Припустимо, що користувач хоче зберегти навіть чорний квадрат.
-            
-            // Якщо полотно не ініціалізовано фоном #111 (наприклад, після очищення), може бути прозорий.
-            // Ми завжди ініціалізуємо його чорним, тому просто відправляємо.
-            
-            dataToSend.arts.push({
-                image: base64Image
-            });
 
-            // Надсилаємо JSON дані боту
-            tg.sendData(JSON.stringify(dataToSend));
-        });
+        # Відповідь користувачу про успішне збереження
+        await update.message.reply_text(
+            f"✅ Дані з Drafts збережено!\n"
+            f"Нотаток: {notes_saved}\n"
+            f"Артів: {arts_saved}\n"
+            f"Нагадувань встановлено: {reminders_set}",
+            # Примітка: MarkdownV2 тут не потрібен, оскільки ми не екрануємо текст.
+        )
+        
+        # Закриваємо Web App після успішної відправки (опціонально, але корисно)
+        # try:
+        #     await context.bot.answer_web_app_query(
+        #         web_app_query_id=update.message.web_app_data.id, 
+        #         result=InlineQueryResultArticle(
+        #             id=str(uuid4()),
+        #             title="Збережено",
+        #             input_message_content=InputTextMessageContent("Дані успішно синхронізовано з ботом.")
+        #         )
+        #     )
+        # except Exception:
+        #     pass
 
-        // --- Запуск --
-        initApp();
-    </script>
-</body>
-</html>
+
+    except json.JSONDecodeError:
+        await update.message.reply_text("Помилка обробки даних з Web App.")
+    except Exception as e:
+        print(f"Помилка в handle_webapp_data: {e}")
+        await update.message.reply_text(f"Сталася помилка: {e}")
+
+# Функції handle_webapp_data та send_reminder_job гарантують, що нагадування прийдуть,
+# а арт буде відправлено як фото, як тільки користувач синхронізує дані.
