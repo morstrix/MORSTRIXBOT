@@ -42,11 +42,11 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "ᴡᴇʟᴄᴏᴍᴇ \n\n"
         "фунᴋціᴏнᴀʌ:\n"
         "➞ /font - ᴛᴇᴋᴄᴛ ᴄᴛᴀйʌᴇᴘ \n"
-        "➞ /drafts - ʜᴏᴛᴇ/ᴀʀᴛ/ᴘᴜꜱʜ \n"
+        "➞ /drafts - ɴᴏᴛᴇ/ᴀʀᴛ/ᴘᴜꜱʜ \n"
         "➞ ᴀʙᴛᴏпᴘийᴏᴍ зᴀяʙᴏᴋ\n"
         "➞ пᴇᴘᴇʙіᴘᴋᴀ пᴏᴄиʌᴀнь\n\n"
         "➞ ШІ — дʌя чʌᴇніʙ ᴋʌубу.\n"
-        "ᴛᴘигᴇᴘ ᴀʌᴏ у гᴘʏпі.\n",
+        "ᴛᴘигᴇᴘ ᴀʌᴏ у гᴘупі.\n",
         parse_mode=ParseMode.MARKDOWN
     )
 
@@ -97,7 +97,8 @@ application.add_handler(CallbackQueryHandler(handle_callback_query))
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members))
 application.add_handler(ChatJoinRequestHandler(handle_join_request))
 
-application.add_handler(MessageHandler(filters.UpdateType.WEB_APP_DATA, handle_web_app_data)) 
+# ✅ ИСПРАВЛЕНО: Использование filters.WEB_APP_DATA вместо filters.UpdateType.WEB_APP_DATA
+application.add_handler(MessageHandler(filters.WEB_APP_DATA, handle_web_app_data)) 
 
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_gemini_message_private))
 application.add_handler(MessageHandler(
@@ -118,6 +119,7 @@ async def start_webhook_server(application: Application):
     
     app = web.Application()
     
+    # ✅ Добавление статики для доступа к drafts.html
     app.router.add_static('/', path='./', name='static_files', follow_symlinks=True) 
 
     webhook_path = f'/{TELEGRAM_BOT_TOKEN}'
@@ -179,6 +181,8 @@ def main():
         asyncio.run(start_webhook_server(application))
     else:
         print("Запуск бота в режиме опроса (Polling).")
+        # ✅ ДОБАВЛЕНО: Запуск JobQueue для режима Polling
+        application.job_queue.start()
         application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
