@@ -102,8 +102,8 @@ application.add_handler(CallbackQueryHandler(handle_callback_query))
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members))
 application.add_handler(ChatJoinRequestHandler(handle_join_request))
 
-# ✅ ФІКС: Використовуємо коректну константу UpdateType.WEB_APP_DATA
-application.add_handler(MessageHandler(UpdateType.WEB_APP_DATA, handle_web_app_data)) 
+# ✅ ФІКС: Використовуємо коректну константу filters.StatusUpdate.WEB_APP_DATA
+application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_web_app_data)) 
 
 # Обработчики Gemini (ІІ з перевіркою)
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_gemini_message_private))
