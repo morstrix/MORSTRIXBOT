@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Art Drafts</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 10px;
+            background-color: var(--tg-theme-bg-color, #f4f4f4);
+            color: var(--tg-theme-text-color, #000);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Стилізація сітки */
+        #canvas-container {
+            border: 2px solid var(--tg-theme-text-color, #ccc); /* Сірий фрейм */
+            background-color: var(--tg-theme-text-color, #ccc); /* Колір між пікселями */
+            margin: 10px 0;
+            display: inline-block;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Холст для піксель-арту */
+        #pixelCanvas {
+            display: block;
+            touch-action: none; /* Відключення скролу на мобільних пристроях під час малювання */
+        }
+
+        /* Стилізація кнопок */
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .controls button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            background-color: var(--tg-theme-button-color, #50a7e8);
+            color: var(--tg-theme-button-text-color, #fff);
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <p>Квадратик-арт</p>
+
+    <div class="controls">
+        <button id="tool-white">⚪️ Пензель</button>
+        <button id="tool-eraser">🧼 Гумка</button>
+        <button id="clear-canvas">❌ Очистити</button>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="pixelCanvas" width="256" height="256"></canvas>
+    </div>
+    
+    <input type="text" id="note-text" placeholder="Опис арту (не обов'язково)" 
+           style="width: 90%; padding: 10px; margin-top: 15px; border-radius: 8px; border: 1px solid #ccc;">
+
+
+    <script>
+        const GRID_SIZE = 16;
+        const PIXEL_SIZE = 256 / GRID_SIZE;
+        const DEFAULT_COLOR = '#808080'; // Сірий (фрейм)
+        const CANVAS_COLOR = '#f0f0f0'; // Білий фон
+        
+        const canvas = document.getElementById('pixelCanvas');
+        const ctx = canvas.getContext('2d');
+        const toolWhite = document.getElementById('tool-white');
+        const toolEraser = document.getElementById('tool-eraser');
+        const clearCanvasBtn = document.getElementById('clear-canvas');
+        
+        let currentColor = '#ffffff'; // Початковий колір - Білий
+
+        // Ініціалізація полотна (малюємо сіру сітку та білий фон)
+        function initCanvas() {
+            ctx.fillStyle = CANVAS_COLOR;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            drawGrid();
+            // Встановлюємо кнопку "Зберегти" в Telegram WebApp
+            Telegram.WebApp.MainButton.text = "ЗБЕРЕГТИ АРТ";
+            Telegram.WebApp.MainButton.show();
+        }
+
+        function drawGrid() {
+            ctx.strokeStyle = DEFAULT_COLOR;
+            ctx.lineWidth = 1;
+            for (let i = 0; i < GRID_SIZE; i++) {
+                // Горизонтальні лінії
+                ctx.beginPath();
+                ctx.moveTo(0, i * PIXEL_SIZE);
+                ctx.lineTo(canvas.width, i * PIXEL_SIZE);
+                ctx.stroke();
+                // Вертикальні лінії
+                ctx.beginPath();
+                ctx.moveTo(i * PIXEL_SIZE, 0);
+                ctx.lineTo(i * PIXEL_SIZE, canvas.height);
+                ctx.stroke();
+            }
+        }
+
+        // Функція для малювання пікселя
+        function drawPixel(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
+            
+            // Визначаємо координати пікселя
+            const pixelX = Math.floor(x / PIXEL_SIZE);
+            const pixelY = Math.floor(y / PIXEL_SIZE);
+
+            // Малюємо квадрат
+            ctx.fillStyle = currentColor;
+            ctx.fillRect(
+                pixelX * PIXEL_SIZE + 1, // +1 для компенсації лінії сітки
+                pixelY * PIXEL_SIZE + 1,
+                PIXEL_SIZE - 2, // -2 для компенсації лінії сітки
+                PIXEL_SIZE - 2
+            );
+        }
+
+        // --- Обробники інструментів ---
+        toolWhite.onclick = () => {
+            currentColor = '#ffffff';
+            toolWhite.style.backgroundColor = 'green';
+            toolEraser.style.backgroundColor = '';
+        };
+
+        toolEraser.onclick = () => {
+            currentColor = CANVAS_COLOR; // Колір фону для стирання
+            toolEraser.style.backgroundColor = 'green';
+            toolWhite.style.backgroundColor = '';
+        };
+
+        clearCanvasBtn.onclick = () => {
+            initCanvas();
+        };
+
+        // --- Обробники подій миші/дотику ---
+        let isDrawing = false;
+
+        canvas.addEventListener('mousedown', (e) => {
+            isDrawing = true;
+            drawPixel(e);
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDrawing) {
+                drawPixel(e);
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDrawing = false;
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            isDrawing = false;
+        });
+        
+        // --- Обробка натискання кнопки Telegram WebApp ---
+        Telegram.WebApp.onEvent('mainButtonClicked', function(){
+            saveDrawing();
+        });
+
+        // --- Функція збереження ---
+        function saveDrawing() {
+            // 1. Отримуємо зображення у форматі base64 PNG
+            const imageDataURL = canvas.toDataURL('image/png'); 
+            const noteText = document.getElementById('note-text').value;
+
+            // 2. Створюємо об'єкт для надсилання боту
+            const dataToSend = JSON.stringify({
+                type: 'pixel_art', 
+                data: imageDataURL, 
+                note: noteText 
+            });
+
+            // 3. Надсилаємо дані боту
+            Telegram.WebApp.sendData(dataToSend);
+            
+            // WebApp буде закрито після отримання відповіді від бота
+        }
+
+        // Запуск
+        Telegram.WebApp.ready();
+        initCanvas();
+
+    </script>
+</body>
+</html>
