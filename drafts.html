@@ -231,6 +231,7 @@ drafts.html
                 WebApp.setHeaderColor(WebApp.themeParams.bg_color);
                 WebApp.onEvent('backButtonClicked', goBackOrClose);
             }
+            
             // Art-специфічна ініціалізація, яка залежить від DOM
             initArtEditor();
             
@@ -244,6 +245,23 @@ drafts.html
             WebApp.MainButton.setText("ENTER [СОХРАНИТЬ]");
             WebApp.MainButton.onClick(handleMainButtonClick);
             WebApp.MainButton.hide();
+
+            // 💥 ФИКС 1: ОБРАБОТКА КЛАВИШИ ENTER ДЛЯ СОЗДАНИЯ КАТАЛОГА 💥
+            const catalogInput = document.getElementById('catalog-name-input');
+            if (catalogInput) {
+                catalogInput.addEventListener('keydown', function(event) {
+                    if (event.key === 'Enter' || event.keyCode === 13) {
+                        event.preventDefault(); 
+                        saveCatalog(); // Вызываем функцию сохранения каталога
+                    }
+                });
+            }
+             
+            // 💥 ФИКС 2: Инициализация sendArtBtn (для избежания ошибки ReferenceError) 💥
+            sendArtBtn = document.getElementById('send-art-btn');
+            if (sendArtBtn) {
+                 sendArtBtn.addEventListener('click', sendArt);
+            }
         }
 
         function saveStore() {
@@ -295,8 +313,9 @@ drafts.html
                 redrawCanvas();
             } else if (viewId === 'push-editor-view') {
                  // Встановлюємо час при відкритті, якщо це новий елемент
+                 const pushDateTime = document.getElementById('push-datetime-input');
                  if (!currentItemId) {
-                    pushDateTime.value = document.getElementById('push-datetime-input').min;
+                    pushDateTime.value = pushDateTime.min;
                  }
             }
         }
@@ -494,7 +513,7 @@ drafts.html
         
         // --- ЛОГІКА ВІДПРАВКИ (Тільки для Арту/Пуша) ---
         
-        sendArtBtn.addEventListener('click', sendArt);
+        // sendArtBtn.addEventListener('click', sendArt); // ❌ ПОМИЛКА: sendArtBtn не ініціалізовано тут
 
         function sendArt() {
             // Зберігаємо останній стан
@@ -526,6 +545,7 @@ drafts.html
             colorPicker = document.getElementById('color-picker');
             toggleToolBtn = document.getElementById('toggle-tool-btn');
             clearArtBtn = document.getElementById('clear-art-btn');
+            // sendArtBtn = document.getElementById('send-art-btn'); // ✅ Ініціалізація в initApp
 
             canvas.width = CANVAS_WIDTH;
             canvas.height = CANVAS_HEIGHT;
