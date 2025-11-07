@@ -7,9 +7,9 @@ from telegram.ext import (
     ChatJoinRequestHandler, CallbackQueryHandler, JobQueue,
     ConversationHandler 
 )
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup 
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup # ✅ ДОДАНО: Inline-кнопки
 from telegram.ext import ContextTypes
-# ✅ ВИПРАВЛЕНО: Додано UpdateType до telegram.constants
+# ✅ ВИПРАВЛЕНО ІМПОРТ: UpdateType повинен бути тут
 from telegram.constants import ParseMode, UpdateType 
 from dotenv import load_dotenv
 from aiohttp import web 
@@ -19,7 +19,7 @@ from ai import handle_gemini_message_group, handle_gemini_message_private
 from handlers import (
     handle_new_members, handle_join_request, handle_callback_query,
     font_start, font_get_text, font_cancel,
-    handle_web_app_data, 
+    handle_web_app_data, # ✅ ВІДНОВЛЕНО
 )
 from safe import check_links 
 
@@ -43,21 +43,23 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "ᴡᴇʟᴄᴏᴍᴇ \n\n"
         "фунᴋціᴏнᴀʌ:\n"
         "➞ /font - ᴛᴇᴋᴄᴛ ᴄᴛᴀйʌᴇᴘ \n"
-        "➞ /drafts - ʜᴏᴛᴇ/ᴀʀᴛ/ᴘᴜꜱʜ \n"
+        "➞ /drafts - ʜᴏᴛᴇ/ᴀʀᴛ/ᴘᴜꜱʜ \n" # ✅ ВІДНОВЛЕНО
         "➞ ᴀʙᴛᴏпᴘийᴏᴍ зᴀяʙᴏᴋ\n"
         "➞ пᴇᴘᴇʙіᴘᴋᴀ пᴏᴄиʌᴀнь\n\n"
         "➞ ШІ — дʌя чʌᴇніʙ ᴋʌубу.\n"
-        "ᴛᴘигᴇᴘ ᴀʌᴏ у гᴘупі.\n",
+        "ᴛᴘигᴇᴘ ᴀʌᴏ у гᴘупі.\n"
+        "➞ ʜᴇʟᴘᴇʀ: ɴᴏᴛᴇ/ᴀʀᴛ/ᴘᴜꜱʜ", # Або можна повернути стару версію тексту, дивлячись на те, яку ви обрали.
         parse_mode=ParseMode.MARKDOWN
     )
 
 job_queue = JobQueue()
 application = Application.builder().token(TELEGRAM_BOT_TOKEN).job_queue(job_queue).build()
 
+# 🆕 СТАНИ ДЛЯ FONT_HANDLER
 FONT_START, FONT_GET_TEXT = range(2)
 
 # ----------------------------------------------------
-#               ФУНКЦІЯ ДЛЯ /drafts
+#               ФУНКЦІЯ ДЛЯ /drafts (ВІДНОВЛЕНО)
 # ----------------------------------------------------
 
 async def drafts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -80,8 +82,9 @@ async def drafts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ====================================================
 
 application.add_handler(CommandHandler("start", start_command))
-application.add_handler(CommandHandler("drafts", drafts_command)) 
+application.add_handler(CommandHandler("drafts", drafts_command)) # ✅ ВІДНОВЛЕНО /drafts
 
+# 💥 FONT CONVERSATION HANDLER 💥
 font_conv_handler = ConversationHandler(
     entry_points=[CommandHandler("font", font_start)],
     states={
@@ -91,6 +94,7 @@ font_conv_handler = ConversationHandler(
     fallbacks=[CommandHandler("cancel", font_cancel)],
     allow_reentry=True
 )
+
 application.add_handler(font_conv_handler)
 
 
@@ -98,15 +102,17 @@ application.add_handler(CallbackQueryHandler(handle_callback_query))
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members))
 application.add_handler(ChatJoinRequestHandler(handle_join_request))
 
-# ✅ ФІНАЛЬНЕ ВИПРАВЛЕННЯ: Використовуємо UpdateType.WEB_APP_DATA, який тепер імпортований коректно
+# ✅ ФІКС: Використовуємо коректну константу UpdateType.WEB_APP_DATA
 application.add_handler(MessageHandler(UpdateType.WEB_APP_DATA, handle_web_app_data)) 
 
+# Обработчики Gemini (ІІ з перевіркою)
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_gemini_message_private))
 application.add_handler(MessageHandler(
     filters.TEXT & ~filters.COMMAND & filters.Regex(r'(?i)ало') & filters.ChatType.GROUPS,
     handle_gemini_message_group
 ))
 
+# ✅ Обробник для перевірки посилань (автоматичний)
 link_filters = filters.Entity("url") | filters.Entity("text_link")
 application.add_handler(MessageHandler(link_filters & filters.ChatType.GROUPS, check_links))
 
@@ -118,11 +124,13 @@ application.add_handler(MessageHandler(link_filters & filters.ChatType.GROUPS, c
 async def start_webhook_server(application: Application):
     """Настраивает и запускает aiohttp сервер для Webhook."""
     
+    # 1. Настройка aiohttp
     app = web.Application()
-    
-    # ✅ Добавление статики для доступа к drafts.html
+
+    # ✅ ВІДНОВЛЕНО: Додаємо статику для доступу до drafts.html
     app.router.add_static('/', path='./', name='static_files', follow_symlinks=True) 
 
+    # 2. Добавляем Webhook Telegram
     webhook_path = f'/{TELEGRAM_BOT_TOKEN}'
     
     async def handle_telegram_webhook(request):
@@ -144,12 +152,15 @@ async def start_webhook_server(application: Application):
 
     app.router.add_post(webhook_path, handle_telegram_webhook)
 
+    # 3. Добавляем простой health check
     async def handle_health_check(request):
         return web.Response(text="Bot is running!", status=200)
     app.router.add_get('/', handle_health_check)
     
+    # Добавляем объект Application и Bot в контекст aiohttp
     app['bot_app'] = application
     
+    # 4. Установка Webhook
     if RENDER_EXTERNAL_URL:
         base_url = RENDER_EXTERNAL_URL.rstrip('/')
         full_webhook_url = f"{base_url}{webhook_path}"
@@ -162,14 +173,14 @@ async def start_webhook_server(application: Application):
         )
         print("Вебхук успешно установлен.")
     
+    # 5. Запуск сервера
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', PORT)
     print(f"Запуск aiohttp Webhook Server на порту {PORT}")
     await site.start()
     
-    # application.start() та application.updater.start_polling() потрібні лише для Polling
-    # Але оскільки вони у Webhook-сервері, вони запускають внутрішній цикл. Залишаємо.
+    # Бесконечный цикл, пока bot_app работает
     await application.start()
     await application.updater.start_polling()
 
@@ -180,12 +191,12 @@ async def start_webhook_server(application: Application):
 def main():
     if os.getenv("RENDER") == "true":
         print("Запуск в режиме Webhook (Render)...")
-        application.job_queue.start() 
+        application.job_queue.start() # Запускаем JobQueue для Webhook
+        # Запускаем асинхронный сервер
         asyncio.run(start_webhook_server(application))
     else:
         print("Запуск бота в режиме опроса (Polling).")
-        # ✅ ДОБАВЛЕНО: Запуск JobQueue для режима Polling
-        application.job_queue.start()
+        application.job_queue.start() # Запускаем JobQueue для Polling
         application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
