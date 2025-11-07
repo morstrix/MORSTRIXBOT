@@ -1,9 +1,8 @@
-main.py
 # main.py (ПОВНИЙ КОД З FLASK)
 
 import os
 import json
-import asyncio
+import asyncio # <--- НОВИЙ ІМПОРТ
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
     ChatJoinRequestHandler, CallbackQueryHandler, ConversationHandler, JobQueue
@@ -19,9 +18,9 @@ from handlers import (
     handle_new_members, handle_join_request, handle_callback_query,
     open_drafts_webapp, handle_webapp_data # handle_webapp_data - нова функція
 )
+# from safe import check_links # (Був закоментований або не існував, але його імпорт був у старому main.py)
 from weather import weather_command
 from translator import translate_text_command, handle_translation_text, TRANSLATE_STATE
-from safe import check_links # Додано імпорт обробника посилань
 
 # ----------------------------------------------------
 # 🛡️ КОНФІГУРАЦІЯ
@@ -37,46 +36,87 @@ PORT = int(os.environ.get("PORT", 8080))
 app = Flask(__name__, template_folder='templates') # Вказуємо папку для HTML
 
 # ----------------------------------------------------
-# 🤖 ТЕЛЕГРАМ-БОТ НАЛАШТУВАННЯ
+#          Ініціалізація Telegram Application
 # ----------------------------------------------------
 
-if not TELEGRAM_BOT_TOKEN:
-    print("Помилка: TELEGRAM_BOT_TOKEN не встановлено.")
-    exit(1)
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Бот запущено та готовий до роботи.")
 
-# Ініціалізація Application та JobQueue
-application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-job_queue = application.job_queue # Ініціалізація job_queue
+# Ініціалізація об'єкта application
+job_queue = JobQueue()
+# JobQueue встановлюється тут:
+application = Application.builder().token(TELEGRAM_BOT_TOKEN).job_queue(job_queue).build()
+
+# Реєстрація Обробників
+application.add_handler(CommandHandler("start", start_command))
+application.add_handler(CommandHandler("weather", weather_command, filters.ChatType.GROUPS | filters.ChatType.PRIVATE))
+application.add_handler(CommandHandler("drafts", open_drafts_webapp, filters.ChatType.PRIVATE))
+
+application.add_handler(CallbackQueryHandler(handle_callback_query, pattern="show_rules"))
+
+translate_conv_handler = ConversationHandler(
+    entry_points=[CommandHandler("translate", translate_text_command, filters.ChatType.GROUPS)],
+    states={TRANSLATE_STATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_translation_text)]},
+    fallbacks=[]
+)
+application.add_handler(translate_conv_handler)
+
+application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members))
+application.add_handler(ChatJoinRequestHandler(handle_join_request))
+
+# === ВИПРАВЛЕННЯ WebApp: ВИКОРИСТОВУЄМО filters.StatusUpdate.WEB_APP_DATA 
+application.add_handler(MessageHandler(
+    filters.StatusUpdate.WEB_APP_DATA,
+    handle_webapp_data
+))
+
+# Обробники Gemini та посилань...
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_gemini_message_private))
+# link_filters = filters.Entity("url") | filters.Entity("text_link")
+# application.add_handler(MessageHandler(link_filters & filters.ChatType.GROUPS, check_links))
+application.add_handler(MessageHandler(
+    filters.TEXT & ~filters.COMMAND & filters.Regex(r'(?i)ало') & filters.ChatType.GROUPS,
+    handle_gemini_message_group
+))
+
 
 # ----------------------------------------------------
-# 🔗 ВЕБХУК ТА FLASK МАРШРУТИ
+#           💥 Обробники Flask (Web App) 💥
 # ----------------------------------------------------
 
-@app.route(f"/{TELEGRAM_BOT_TOKEN}", methods=["POST"])
+@app.route(f'/{TELEGRAM_BOT_TOKEN}', methods=['POST'])
 async def telegram_webhook():
-    """Обробляє вхідні оновлення від Telegram."""
-    if request.method == "POST":
-        await application.process_update(
-            Update.de_json(request.get_json(force=True), application.bot)
-        )
-    return "ok"
+    """Обробляє запити Webhook від Telegram."""
+    if request.content_length > 10**6: # Обмеження розміру запиту (наприклад, 1MB)
+        print("Запит занадто великий, ігнорується.")
+        return "request too large", 413
+        
+    try:
+        data = request.get_json(force=True)
+    except Exception as e:
+        print(f"Помилка отримання JSON: {e}")
+        return "bad request", 400
+        
+    await application.update_queue.put(Update.de_json(data=data, bot=application.bot))
+    return "ok", 200
 
-@app.route("/")
+@app.route('/drafts')
+def webapp_drafts():
+    """Обслуговує HTML-файл для Web App (виправлення 404)."""
+    # Flask шукає drafts.html у папці 'templates'
+    return render_template('drafts.html') 
+
+@app.route('/')
 def index():
-    """Сторінка-заглушка для перевірки статусу."""
-    return "Bot is running! Webhook is ready."
-
-@app.route("/drafts")
-def drafts():
-    """Відкриває Telegram WebApp"""
-    return "This route is for demonstration or internal use."
+    """Проста сторінка, щоб перевірити, чи працює Flask."""
+    return "Flask server is running."
 
 # ----------------------------------------------------
-# ⚙️ АСИНХРОННЕ НАЛАШТУВАННЯ
+#                      Запуск
 # ----------------------------------------------------
 
 async def setup_webhook():
-    """Встановлює вебхук для Telegram-бота."""
+    """Встановлює вебхук."""
     if RENDER_EXTERNAL_URL and TELEGRAM_BOT_TOKEN:
         base_url = RENDER_EXTERNAL_URL.rstrip('/')
         full_webhook_url = f"{base_url}/{TELEGRAM_BOT_TOKEN}"
@@ -94,73 +134,15 @@ async def setup_webhook():
     else:
         print("RENDER_EXTERNAL_URL або TELEGRAM_BOT_TOKEN не встановлено. Вебхук не налаштовано.")
 
-
-# ----------------------------------------------------
-# 🚀 ДОДАВАННЯ ОБРОБНИКІВ
-# ----------------------------------------------------
-
-def add_handlers():
-    """Додає всі обробники до бота."""
-    # 1. Обробники повідомлень
-    application.add_handler(MessageHandler(filters.TEXT & filters.ChatType.PRIVATE, handle_gemini_message_private))
-    application.add_handler(MessageHandler(
-        filters.TEXT & filters.ChatType.GROUPS & (filters.Regex('^ало|@') | filters.Mention(application.bot.username)), 
-        handle_gemini_message_group
-    ))
-    application.add_handler(MessageHandler(
-        filters.Entity('url') | filters.Entity('text_link'), check_links, block=False
-    ))
-
-    # 2. Обробники команд
-    application.add_handler(CommandHandler("weather", weather_command))
-    application.add_handler(CommandHandler("drafts", open_drafts_webapp))
-
-    # 3. Обробники Web App
-    application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
-
-    # 4. Обробники розмов (ConversationHandler)
-    translate_handler = ConversationHandler(
-        entry_points=[CommandHandler("translate", translate_text_command)],
-        states={
-            TRANSLATE_STATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_translation_text)]
-        },
-        fallbacks=[],
-        conversation_timeout=60 * 5, # 5 хвилин
-    )
-    application.add_handler(translate_handler)
-
-    # 5. Обробники вступу/виходу та запитів на вступ
-    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members))
-    application.add_handler(ChatJoinRequestHandler(handle_join_request))
-    application.add_handler(CallbackQueryHandler(handle_callback_query))
-
-
-# ----------------------------------------------------
-# 🚀 ЗАПУСК БОТА
-# ----------------------------------------------------
-
-add_handlers() # Додаємо обробники
-
 def main():
-    """Точка входу для запуску бота."""
     if os.getenv("RENDER") == "true":
         print("Запуск в режимі Webhook (Render)...")
         
-        # 💡 ВИПРАВЛЕННЯ ПОМИЛКИ: Замість нестабільного asyncio.run() ми безпечно виконуємо
-        # асинхронну функцію налаштування вебхука, використовуючи нижньорівневий API asyncio.
+        # Налаштовуємо та запускаємо вебхук асинхронно
         try:
-            # 1. Спробуємо отримати поточний цикл подій.
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            # 2. Якщо циклу немає (це нормально для основного потоку), створюємо новий.
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        
-        try:
-            # 3. Безпечно виконуємо асинхронну функцію, уникаючи конфлікту вкладених циклів.
-            loop.run_until_complete(setup_webhook())
+            # ВИПРАВЛЕНО: Використовуємо asyncio.run() для запуску асинхронної setup_webhook
+            asyncio.run(setup_webhook())
         except Exception as e:
-            # Обробка помилок під час виконання setup_webhook()
             print(f"Помилка під час асинхронного запуску setup_webhook: {e}")
             
         print(f"Запуск Flask Web App на порту {PORT}")
@@ -168,22 +150,11 @@ def main():
         app.run(host="0.0.0.0", port=PORT, debug=False)
 
     else:
-        print("Запуск бота в режимі опитування...")
-        # Використовуємо asyncio.run для запуску основного асинхронного циклу для опитування
-        async def run_polling():
-            # Пробуємо видалити вебхук перед запуском опитування
-            try:
-                await application.bot.delete_webhook()
-            except Exception as e:
-                print(f"Помилка видалення вебхука: {e}")
+        print("Запуск бота в режимі опитування (Polling).")
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
 
-            await application.run_polling(poll_interval=1.0)
-            
-        try:
-            # Використовуємо asyncio.run для запуску основного асинхронного циклу
-            asyncio.run(run_polling())
-        except KeyboardInterrupt:
-            print("Бот зупинено користувачем.")
-
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        print(f"Сталася фатальна помилка при запуску: {e}")
