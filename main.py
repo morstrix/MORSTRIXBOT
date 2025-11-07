@@ -62,9 +62,14 @@ application.add_handler(translate_conv_handler)
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members))
 application.add_handler(ChatJoinRequestHandler(handle_join_request))
 
-# Обробник Web App Data (дані, які надсилає ваш drafts.html)
+# =================================================================
+# === 💥 ОСЬ ВИПРАВЛЕННЯ 💥 ===
+#
+# Помилка була "filters.FROM_WEBAPP".
+# Правильний фільтр: "filters.WEB_APP_DATA"
+# =================================================================
 application.add_handler(MessageHandler(
-    filters.TEXT & filters.FROM_WEBAPP,
+    filters.WEB_APP_DATA,
     handle_webapp_data
 ))
 
