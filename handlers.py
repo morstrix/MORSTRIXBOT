@@ -334,7 +334,6 @@ async def open_drafts_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE)
     )
 
 # --- Обробник даних з WebApp ---
-# Додаємо send_reminder_job
 async def send_reminder_job(context: ContextTypes.DEFAULT_TYPE):
     """Надсилає нагадування користувачеві."""
     chat_id = context.job.data.get('chat_id')
@@ -349,7 +348,6 @@ async def send_reminder_job(context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             print(f"Помилка відправки нагадування в чат {chat_id}: {e}")
 
-# Оновлений handle_webapp_data
 async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Обробляє дані, надіслані з Telegram Web App (drafts.html).
