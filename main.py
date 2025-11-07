@@ -18,7 +18,7 @@ from ai import handle_gemini_message_group, handle_gemini_message_private
 from handlers import (
     handle_new_members, handle_join_request, handle_callback_query,
     font_start, font_get_text, font_cancel,
-    handle_web_app_data, # ✅ ОБРАБОТЧИК ДАННЫХ WEB APP
+    handle_web_app_data, 
 )
 from safe import check_links 
 
@@ -26,7 +26,6 @@ from safe import check_links
 # 🛡️ КОНФИГУРАЦИЯ
 # ----------------------------------------------------
 
-# Завантажуємо змінні оточення
 if os.getenv("RENDER") != "true":
     load_dotenv()
 
@@ -51,11 +50,9 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode=ParseMode.MARKDOWN
     )
 
-# Инициализация объекта application и JobQueue
 job_queue = JobQueue()
 application = Application.builder().token(TELEGRAM_BOT_TOKEN).job_queue(job_queue).build()
 
-# 💥 СТАНИ ДЛЯ FONT_HANDLER 💥
 FONT_START, FONT_GET_TEXT = range(2)
 
 # ----------------------------------------------------
@@ -65,15 +62,13 @@ FONT_START, FONT_GET_TEXT = range(2)
 async def drafts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Відкриває Web App з чернетками (drafts)."""
     
-    # URL до файлу drafts.html
     web_app_url = f"{RENDER_EXTERNAL_URL.rstrip('/')}/drafts.html" if RENDER_EXTERNAL_URL else "https://example.com/drafts.html"
     
-    # Кнопка для відкриття Web App
-    keyboard = [[InlineKeyboardButton("📝 Відкрити Art Helper", web_app={"url": web_app_url})]]
+    keyboard = [[InlineKeyboardButton("📝 ВІДКРИТИ DRAFTZ", web_app={"url": web_app_url})]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
-        "📝 **MORSTRIX ART HELPER** \nСтворюй піксельний арт, замітки та нагадування.",
+        "📝 **MORSTRIX DRAFTZ** \nСтворюй каталоги, нотатки, нагадування та піксельний арт.",
         reply_markup=reply_markup,
         parse_mode=ParseMode.MARKDOWN
     )
@@ -83,11 +78,9 @@ async def drafts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #              РЕЄСТРАЦІЯ ОБРОБНИКІВ
 # ====================================================
 
-# Основні команди
 application.add_handler(CommandHandler("start", start_command))
 application.add_handler(CommandHandler("drafts", drafts_command)) 
 
-# FONT CONVERSATION HANDLER
 font_conv_handler = ConversationHandler(
     entry_points=[CommandHandler("font", font_start)],
     states={
@@ -100,22 +93,18 @@ font_conv_handler = ConversationHandler(
 application.add_handler(font_conv_handler)
 
 
-# Обробники подій
 application.add_handler(CallbackQueryHandler(handle_callback_query)) 
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members))
 application.add_handler(ChatJoinRequestHandler(handle_join_request))
 
-# ✅ Обробник для даних, що надходять від Web App
 application.add_handler(MessageHandler(filters.UpdateType.WEB_APP_DATA, handle_web_app_data)) 
 
-# Обробники Gemini (ІІ)
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_gemini_message_private))
 application.add_handler(MessageHandler(
     filters.TEXT & ~filters.COMMAND & filters.Regex(r'(?i)ало') & filters.ChatType.GROUPS,
     handle_gemini_message_group
 ))
 
-# Обробник для перевірки посилань
 link_filters = filters.Entity("url") | filters.Entity("text_link")
 application.add_handler(MessageHandler(link_filters & filters.ChatType.GROUPS, check_links))
 
@@ -129,7 +118,6 @@ async def start_webhook_server(application: Application):
     
     app = web.Application()
     
-    # Обробник для статичного файлу drafts.html
     app.router.add_static('/', path='./', name='static_files', follow_symlinks=True) 
 
     webhook_path = f'/{TELEGRAM_BOT_TOKEN}'
@@ -187,7 +175,6 @@ async def start_webhook_server(application: Application):
 def main():
     if os.getenv("RENDER") == "true":
         print("Запуск в режиме Webhook (Render)...")
-        # ✅ ЗАПУСКАЄМО JobQueue для нагадувань
         application.job_queue.start() 
         asyncio.run(start_webhook_server(application))
     else:

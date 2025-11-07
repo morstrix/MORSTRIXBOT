@@ -3,195 +3,553 @@ drafts.html
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MORSTRIX | Архів (Pixel Art)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MORSTRIX | DRAFTZ</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        /* Стилі, адаптовані під естетику */
+        /* --- РЕТРО СТИЛЬ --- */
         :root {
-            --bg-color: #000000; 
-            --grid-color: #3a3a3a; 
-            --text-color: #00ff00; 
-            --accent-color: #ff00ff; 
-            --draw-color: #ffffff; 
-            --erase-color: #000000; 
-            --cell-size: 15px; /* Зменшено для кращого відображення сітки */
-            --grid-dimension: 30; /* Розмір сітки 30x30 */
+            --bg-color: #000000;
+            --main-green: #00ff00; /* Яркий текст */
+            --dark-green: #008000; /* Темный акцент */
+            --red-exit: #ff0000;
+            --grid-color: #111111;
+            --canvas-bg: #222222; /* Темно-серый холст */
+            --cell-size: 15px;
+            --input-bg: #0d0d0d;
         }
 
         body {
-            font-family: monospace; /* Використовуємо monospace, якщо "Press Start 2P" недоступний */
+            font-family: monospace; /* Ретро-шрифт (замените на Press Start 2P, если он есть) */
             background-color: var(--bg-color);
-            color: var(--text-color);
+            color: var(--main-green);
             margin: 0;
-            padding: 20px;
+            padding: 10px;
             overflow-x: hidden;
             touch-action: pan-y;
             image-rendering: pixelated;
         }
 
-        /* Загальні елементи */
-        button {
-            background-color: var(--accent-color);
+        /* --- Кнопки и Управление --- */
+        .header-title {
+            text-align: center;
+            font-size: 20px;
+            padding-bottom: 15px;
+            text-shadow: 0 0 5px var(--main-green);
+        }
+
+        .action-button, .item-button {
+            display: block;
+            width: 100%;
+            background-color: var(--dark-green);
             color: var(--bg-color);
-            border: none;
-            padding: 10px 15px;
-            margin: 5px;
+            border: 2px solid var(--main-green);
+            padding: 15px 10px;
+            margin-bottom: 10px;
             cursor: pointer;
             text-transform: uppercase;
             font-size: 14px;
+            text-align: left;
+            box-shadow: 0 0 5px var(--dark-green);
+            transition: background-color 0.1s;
         }
-        button:hover {
-            opacity: 0.8;
+        .action-button:hover, .item-button:hover {
+            background-color: var(--main-green);
+            color: var(--bg-color);
+        }
+        .item-button span {
+            float: right;
+            color: var(--main-green);
+        }
+        
+        .item-button:hover span {
+            color: var(--bg-color);
         }
 
-        /* Стилі для вкладок */
-        .tab-buttons {
-            display: flex;
-            margin-bottom: 20px;
-        }
-        .tab-button {
-            flex-grow: 1;
-            background-color: #222;
-            color: var(--text-color);
-            border-bottom: 3px solid transparent;
-            padding: 10px;
-            margin: 0 5px;
-        }
-        .tab-button.active {
-            background-color: var(--bg-color);
-            border-bottom: 3px solid var(--accent-color);
-        }
-        .tab-content {
+        /* --- Контейнеры Вьюшек --- */
+        .view {
             display: none;
+            padding-bottom: 50px; /* Отступ для MainButton */
         }
-        .tab-content.active {
+        .view.active {
             display: block;
         }
 
-        /* Стилі для Pixel Art */
-        #art-section {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+        /* --- Кнопка Выхода (Имитация крестика) --- */
+        #exit-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: var(--red-exit);
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 1000;
+            text-shadow: 0 0 5px var(--red-exit);
+        }
+
+        /* --- Поля Ввода --- */
+        input[type="text"], input[type="datetime-local"], textarea {
+            width: 95%;
+            padding: 10px;
+            background-color: var(--input-bg);
+            border: 1px solid var(--dark-green);
+            color: var(--main-green);
+            font-size: 16px;
+            margin-bottom: 10px;
+            resize: none;
+        }
+        
+        /* --- Pixel Art Editor --- */
+        #art-canvas-container {
+            width: 100%;
+            max-width: 450px; /* Ограничение для больших экранов */
+            margin: 0 auto 10px;
+            background-color: var(--canvas-bg);
+            border: 2px solid var(--main-green);
+            overflow: hidden;
+            touch-action: none;
         }
         #pixel-canvas {
-            border: 2px solid var(--grid-color);
-            background-color: var(--erase-color);
+            display: block;
+            touch-action: none;
             cursor: crosshair;
-            touch-action: none; /* Запобігає прокручуванню під час малювання */
-            margin-bottom: 10px;
         }
         .art-controls {
             display: flex;
-            justify-content: center;
+            justify-content: space-around;
             flex-wrap: wrap;
-            margin-bottom: 20px;
+            margin-bottom: 10px;
+        }
+        .art-controls button {
+            background-color: #333;
+            color: var(--main-green);
+            border: 1px solid var(--main-green);
+            padding: 8px 12px;
+            margin: 5px;
+            font-size: 12px;
         }
         #color-picker {
-            margin: 5px 15px;
-            border: 2px solid var(--accent-color);
-            background: var(--bg-color);
-            height: 40px;
-            width: 40px;
+            border: 1px solid var(--main-green);
+            padding: 0;
+            height: 30px;
+            width: 30px;
+            cursor: pointer;
         }
 
-        /* Стилі для Push/Reminder */
-        .push-input-group {
-            margin-bottom: 15px;
-        }
-        .push-input-group label {
-            display: block;
-            margin-bottom: 5px;
-            color: var(--accent-color);
-        }
-        .push-input-group input[type="datetime-local"],
-        .push-input-group textarea {
-            width: 90%;
-            padding: 10px;
-            background-color: #111;
-            border: 1px solid var(--grid-color);
-            color: var(--text-color);
-            font-size: 16px;
-            resize: vertical;
-        }
     </style>
 </head>
 <body>
-    <div class="tab-buttons">
-        <button id="tab-art-btn" class="tab-button active">Pixel Art</button>
-        <button id="tab-push-btn" class="tab-button">Нагадування (Push)</button>
-    </div>
 
-    <div id="art-tab" class="tab-content active">
-        <h2>Pixel Art Helper</h2>
-        <p>Ключ для поточної чернетки: <span id="current-cell-key">ART_A</span></p>
+    <div id="exit-btn" onclick="goBackOrClose()">❌</div>
 
-        <div id="art-section">
-            <canvas id="pixel-canvas"></canvas>
-            <div class="art-controls">
-                <input type="color" id="color-picker" value="#ffffff">
-                <button id="toggle-tool-btn" data-tool="pen">✏️ Pen</button>
-                <button id="clear-art-btn">🗑️ Очистити</button>
-                <button id="send-art-btn">📨 Надіслати Арт</button>
+    <div id="catalog-list-view" class="view active">
+        <div class="header-title">DRAFTZ / CATALOGS</div>
+        <div id="catalogs-container">
             </div>
+        <button class="action-button" onclick="showCatalogCreator()">+ СТВОРИТИ КАТАЛОГ</button>
+    </div>
+
+    <div id="item-list-view" class="view">
+        <div class="header-title" id="item-list-title"></div>
+        <div id="items-container">
+            </div>
+        <button class="action-button" onclick="showItemCreator()">+ СТВОРИТИ ЕЛЕМЕНТ</button>
+    </div>
+    
+    <div id="catalog-editor-view" class="view">
+        <div class="header-title">КАТАЛОГ / СТВОРЕННЯ</div>
+        <input type="text" id="catalog-name-input" placeholder="Назва Каталогу">
+    </div>
+
+    <div id="item-creator-view" class="view">
+        <div class="header-title">ОБЕРИ ТИП ЕЛЕМЕНТА</div>
+        <button class="action-button" onclick="showNoteEditor()">📝 НОВА ЗАМІТКА</button>
+        <button class="action-button" onclick="showPushEditor()">⏰ НОВЕ НАГАДУВАННЯ</button>
+        <button class="action-button" onclick="showArtEditor()">🎨 НОВИЙ АРТ</button>
+    </div>
+
+
+    <div id="note-editor-view" class="view">
+        <div class="header-title">ЗАМІТКА / РЕДАКТОР</div>
+        <input type="text" id="note-name-input" placeholder="Назва Замітки">
+        <textarea id="note-text-input" rows="10" placeholder="Текст замітки..."></textarea>
+    </div>
+
+    <div id="push-editor-view" class="view">
+        <div class="header-title">НАГАДУВАННЯ / НАЛАШТУВАННЯ</div>
+        <input type="text" id="push-name-input" placeholder="Назва Нагадування">
+        <p>Дата і Час (Ваш локальний час):</p>
+        <input type="datetime-local" id="push-datetime-input">
+        <textarea id="push-text-input" rows="4" placeholder="Текст нагадування..."></textarea>
+    </div>
+
+    <div id="art-editor-view" class="view">
+        <div class="header-title">ПІКСЕЛЬНИЙ АРТ / РЕДАКТОР</div>
+        <input type="text" id="art-name-input" placeholder="Назва Арту">
+        
+        <div id="art-canvas-container">
+            <canvas id="pixel-canvas"></canvas>
+        </div>
+
+        <div class="art-controls">
+            <input type="color" id="color-picker" value="#ffffff" title="Колір">
+            <button id="toggle-tool-btn" data-tool="pen">✏️ Кисть</button>
+            <button id="clear-art-btn">🗑️ Очистити</button>
+            <button id="send-art-btn">📨 НАДІСЛАТИ</button>
         </div>
     </div>
 
-    <div id="push-tab" class="tab-content">
-        <h2>Налаштування Нагадування</h2>
-        
-        <div class="push-input-group">
-            <label for="push-datetime">Дата і Час (Ваш локальний час):</label>
-            <input type="datetime-local" id="push-datetime">
-        </div>
-        
-        <div class="push-input-group">
-            <label for="push-text">Текст Нагадування:</label>
-            <textarea id="push-text" rows="4" placeholder="Не забудь написати код..."></textarea>
-        </div>
-
-        <button id="send-push-btn">⏰ Запланувати Нагадування</button>
-    </div>
-
-    <button id="save-and-close-btn" style="width: 100%; margin-top: 20px;">Закрити Web App</button>
 
     <script>
-        const GRID_DIMENSION = 30; 
-        const CELL_SIZE = 10; // Зменшено для відображення 30x30 на мобільному
+        // --- КОНСТАНТИ ---
+        const WebApp = window.Telegram.WebApp;
+        const GRID_DIMENSION = 20; 
+        const CELL_SIZE = 15; 
+        const CANVAS_WIDTH = GRID_DIMENSION * CELL_SIZE;
+        const CANVAS_HEIGHT = GRID_DIMENSION * CELL_SIZE;
         
-        const canvas = document.getElementById('pixel-canvas');
-        const ctx = canvas.getContext('2d');
-        const colorPicker = document.getElementById('color-picker');
-        const toggleToolBtn = document.getElementById('toggle-tool-btn');
-        const clearArtBtn = document.getElementById('clear-art-btn');
-        const sendArtBtn = document.getElementById('send-art-btn');
-        const saveAndCloseBtn = document.getElementById('save-and-close-btn');
-
-        const pushDateTime = document.getElementById('push-datetime');
-        const pushText = document.getElementById('push-text');
-        const sendPushBtn = document.getElementById('send-push-btn');
-        const currentCellKeyElement = document.getElementById('current-cell-key');
-
+        // --- СТАН ДОДАТКУ ---
+        let currentView = 'catalog-list-view';
+        let viewHistory = [];
+        let dataStore = JSON.parse(localStorage.getItem('draftsData') || '{"catalogs": {}}');
+        let currentCatalogId = null;
+        let currentItemId = null;
+        let currentItemType = null; // 'note', 'push', 'art'
+        
+        // --- PIXEL ART СТАН ---
+        let canvas, ctx, colorPicker, toggleToolBtn, clearArtBtn, sendArtBtn;
         let pixelGrid;
         let isDrawing = false;
-        let currentDrawColor = colorPicker.value;
-        let currentTool = 'pen'; // 'pen' or 'eraser'
-        let currentCellKey = 'ART_A'; // Початковий ключ
+        let currentDrawColor = '#ffffff';
+        let currentTool = 'pen'; 
+        
+        // --- ІНІЦІАЛІЗАЦІЯ ---
 
-        // --- Ініціалізація та Логіка Art ---
-
-        function generateGrid() {
-            canvas.width = GRID_DIMENSION * CELL_SIZE;
-            canvas.height = GRID_DIMENSION * CELL_SIZE;
+        function initApp() {
+            if (WebApp) {
+                WebApp.ready();
+                WebApp.setHeaderColor(WebApp.themeParams.bg_color);
+                WebApp.onEvent('backButtonClicked', goBackOrClose);
+            }
+            // Art-специфічна ініціалізація, яка залежить від DOM
+            initArtEditor();
+            
+            // Встановлюємо дату за замовчуванням
+            const now = new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60000));
+            document.getElementById('push-datetime-input').min = now.toISOString().slice(0, 16);
+            
+            showView('catalog-list-view');
+            
+            // Налаштування MainButton
+            WebApp.MainButton.setText("ENTER [СОХРАНИТЬ]");
+            WebApp.MainButton.onClick(handleMainButtonClick);
+            WebApp.MainButton.hide();
         }
 
+        function saveStore() {
+            localStorage.setItem('draftsData', JSON.stringify(dataStore));
+        }
+
+        // --- ЛОГІКА НАВІГАЦІЇ ---
+
+        function updateMainButton(isVisible, text = "ENTER [СОХРАНИТЬ]", color = WebApp.themeParams.button_color) {
+            if (!WebApp) return;
+            WebApp.MainButton.setText(text);
+            WebApp.MainButton.setParams({color: color});
+            isVisible ? WebApp.MainButton.show() : WebApp.MainButton.hide();
+        }
+
+        function updateBackButton(isVisible) {
+             if (!WebApp) return;
+             isVisible ? WebApp.BackButton.show() : WebApp.BackButton.hide();
+        }
+
+        function showView(viewId, isNewContext = true) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+
+            if (isNewContext && viewId !== currentView) {
+                viewHistory.push(currentView);
+            }
+            currentView = viewId;
+            
+            // Налаштування кнопок для кожного view
+            let buttonVisible = false;
+            let backVisible = true;
+            
+            if (viewId === 'catalog-list-view') {
+                 backVisible = false;
+                 updateCatalogList();
+            } else if (viewId.includes('editor-view')) {
+                 buttonVisible = true;
+            } else if (viewId === 'item-list-view') {
+                 updateItemList();
+            }
+            
+            updateMainButton(buttonVisible);
+            updateBackButton(backVisible);
+            
+            // Додаткова логіка для редакторів
+            if (viewId === 'art-editor-view') {
+                loadArt(currentItemId);
+                redrawCanvas();
+            } else if (viewId === 'push-editor-view') {
+                 // Встановлюємо час при відкритті, якщо це новий елемент
+                 if (!currentItemId) {
+                    pushDateTime.value = document.getElementById('push-datetime-input').min;
+                 }
+            }
+        }
+        
+        function goBackOrClose() {
+            if (viewHistory.length > 0) {
+                const prevView = viewHistory.pop();
+                showView(prevView, false); // false - щоб не додавати в історію
+            } else {
+                if (WebApp) {
+                    WebApp.close();
+                } else {
+                    alert("Закриття Web App (в режимі налагодження)");
+                }
+            }
+        }
+        
+        // --- ЛОГІКА СПИСКІВ (КАТАЛОГИ/ЕЛЕМЕНТИ) ---
+        
+        function generateUniqueId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        }
+
+        function updateCatalogList() {
+            const container = document.getElementById('catalogs-container');
+            container.innerHTML = '';
+            
+            Object.entries(dataStore.catalogs).forEach(([id, catalog]) => {
+                const btn = document.createElement('button');
+                btn.className = 'item-button';
+                btn.innerHTML = `${catalog.name} <span>${Object.keys(catalog.items).length}</span>`;
+                btn.onclick = () => openCatalog(id);
+                container.appendChild(btn);
+            });
+        }
+        
+        function updateItemList() {
+            if (!currentCatalogId) return goBackOrClose();
+
+            const catalog = dataStore.catalogs[currentCatalogId];
+            document.getElementById('item-list-title').textContent = `DRAFTZ / ${catalog.name.toUpperCase()}`;
+            const container = document.getElementById('items-container');
+            container.innerHTML = '';
+
+            Object.entries(catalog.items).forEach(([itemId, item]) => {
+                const btn = document.createElement('button');
+                btn.className = 'item-button';
+                let typeIcon = '';
+                if (item.type === 'note') typeIcon = '📝';
+                if (item.type === 'push') typeIcon = '⏰';
+                if (item.type === 'art') typeIcon = '🎨';
+                
+                btn.innerHTML = `${typeIcon} ${item.name} <span>EDIT</span>`;
+                btn.onclick = () => openItem(itemId, item.type);
+                container.appendChild(btn);
+            });
+        }
+        
+        function openCatalog(id) {
+            currentCatalogId = id;
+            currentItemId = null;
+            currentItemType = null;
+            showView('item-list-view');
+        }
+
+        function openItem(id, type) {
+            currentItemId = id;
+            currentItemType = type;
+            const item = dataStore.catalogs[currentCatalogId].items[id];
+            
+            // Завантаження даних в редактори
+            if (type === 'note') {
+                document.getElementById('note-name-input').value = item.name;
+                document.getElementById('note-text-input').value = item.text || '';
+                showView('note-editor-view');
+            } else if (type === 'push') {
+                document.getElementById('push-name-input').value = item.name;
+                document.getElementById('push-datetime-input').value = item.datetime || '';
+                document.getElementById('push-text-input').value = item.text || '';
+                showView('push-editor-view');
+            } else if (type === 'art') {
+                document.getElementById('art-name-input').value = item.name;
+                showView('art-editor-view');
+            }
+        }
+
+        // --- ЛОГІКА СТВОРЕННЯ ---
+        
+        function showCatalogCreator() {
+            currentItemId = null; 
+            document.getElementById('catalog-name-input').value = '';
+            showView('catalog-editor-view');
+        }
+
+        function showItemCreator() {
+            currentItemId = null; 
+            currentItemType = null;
+            showView('item-creator-view');
+        }
+
+        function showNoteEditor() {
+            currentItemType = 'note';
+            showView('note-editor-view');
+        }
+        
+        function showPushEditor() {
+            currentItemType = 'push';
+            showView('push-editor-view');
+        }
+
+        function showArtEditor() {
+            currentItemType = 'art';
+            // Якщо це новий арт, скидаємо назву і сітку
+            if (!currentItemId) {
+                document.getElementById('art-name-input').value = 'Новий Арт';
+                initPixelGrid(); 
+            }
+            showView('art-editor-view');
+        }
+
+        // --- ЛОГІКА ЗБЕРЕЖЕННЯ (MainButton Click) ---
+
+        function handleMainButtonClick() {
+            if (currentView === 'catalog-editor-view') {
+                saveCatalog();
+            } else if (currentView === 'note-editor-view') {
+                saveNote();
+            } else if (currentView === 'push-editor-view') {
+                savePush();
+            } else if (currentView === 'art-editor-view') {
+                saveArtItem();
+            }
+        }
+
+        function saveCatalog() {
+            const name = document.getElementById('catalog-name-input').value.trim() || "Новий Каталог";
+            const id = currentItemId || generateUniqueId();
+            
+            if (!dataStore.catalogs[id]) {
+                dataStore.catalogs[id] = {id: id, name: name, items: {}};
+            } else {
+                dataStore.catalogs[id].name = name;
+            }
+            saveStore();
+            showView('catalog-list-view');
+        }
+        
+        function saveItem(type) {
+            const id = currentItemId || generateUniqueId();
+            const catalog = dataStore.catalogs[currentCatalogId];
+            
+            let name, data;
+            
+            if (type === 'note') {
+                name = document.getElementById('note-name-input').value.trim() || "Нова Замітка";
+                data = {
+                    text: document.getElementById('note-text-input').value,
+                };
+            } else if (type === 'push') {
+                name = document.getElementById('push-name-input').value.trim() || "Нагадування";
+                data = {
+                    datetime: document.getElementById('push-datetime-input').value,
+                    text: document.getElementById('push-text-input').value,
+                };
+            } else if (type === 'art') {
+                name = document.getElementById('art-name-input').value.trim() || "Піксельний Арт";
+                // Art data is already saved in pixelGrid/localStorage
+                data = {}; 
+            }
+            
+            catalog.items[id] = {
+                id: id,
+                type: type,
+                name: name,
+                ...data
+            };
+            saveStore();
+            currentItemId = id; // Встановлюємо ID, щоб можна було відправити
+        }
+
+        function saveNote() {
+            saveItem('note');
+            showView('item-list-view');
+        }
+        
+        function savePush() {
+            saveItem('push');
+            showView('item-list-view');
+        }
+
+        function saveArtItem() {
+            saveItem('art');
+            showView('item-list-view');
+        }
+        
+        // --- ЛОГІКА ВІДПРАВКИ (Тільки для Арту/Пуша) ---
+        
+        sendArtBtn.addEventListener('click', sendArt);
+
+        function sendArt() {
+            // Зберігаємо останній стан
+            saveArtItem(); 
+            
+            if (!currentItemId) return alert("Спочатку збережіть арт.");
+
+            const artData = localStorage.getItem(`morstrix_art_${currentItemId}`);
+            if (!artData) return alert("Арт пустий.");
+            
+            const name = dataStore.catalogs[currentCatalogId].items[currentItemId].name;
+
+            // Формат даних: "ART|CATALOG_ID_ITEM_ID|JSON_PAYLOAD"
+            const data = `ART|${currentCatalogId}_${currentItemId}|${artData}`;
+
+            if (WebApp) {
+                WebApp.sendData(data);
+                WebApp.close();
+            } else {
+                alert(`ART Data Sent (debug): ${data.substring(0, 100)}...`);
+            }
+        }
+        
+        // --- ЛОГІКА PIXEL ART ---
+
+        function initArtEditor() {
+            canvas = document.getElementById('pixel-canvas');
+            ctx = canvas.getContext('2d');
+            colorPicker = document.getElementById('color-picker');
+            toggleToolBtn = document.getElementById('toggle-tool-btn');
+            clearArtBtn = document.getElementById('clear-art-btn');
+
+            canvas.width = CANVAS_WIDTH;
+            canvas.height = CANVAS_HEIGHT;
+            
+            initPixelGrid();
+
+            // Обробники
+            canvas.addEventListener('mousedown', handlePointerStart);
+            canvas.addEventListener('mousemove', handlePointerMove);
+            document.addEventListener('mouseup', handlePointerEnd);
+            canvas.addEventListener('touchstart', handlePointerStart);
+            canvas.addEventListener('touchmove', handlePointerMove);
+            canvas.addEventListener('touchend', handlePointerEnd);
+            colorPicker.addEventListener('input', (e) => { currentDrawColor = e.target.value; if (currentTool === 'eraser') toggleTool(); });
+            toggleToolBtn.addEventListener('click', toggleTool);
+            clearArtBtn.addEventListener('click', () => { if(confirm("Очистити?")) { initPixelGrid(); redrawCanvas(); saveArt(currentItemId); } });
+        }
+        
         function initPixelGrid() {
             pixelGrid = Array(GRID_DIMENSION).fill(0).map(() => Array(GRID_DIMENSION).fill(null));
         }
 
         function redrawCanvas() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
             
             // 1. Малюємо пікселі
             for (let y = 0; y < GRID_DIMENSION; y++) {
@@ -204,16 +562,15 @@ drafts.html
                 }
             }
 
-            // 2. Малюємо сітку
-            ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--grid-color');
+            // 2. Малюємо сітку (темно-сіра, як фон холста)
+            ctx.strokeStyle = '#2d2d2d'; 
+            ctx.lineWidth = 1;
             for (let i = 0; i <= GRID_DIMENSION; i++) {
                 ctx.beginPath();
-                // Вертикальні лінії
                 ctx.moveTo(i * CELL_SIZE, 0);
-                ctx.lineTo(i * CELL_SIZE, canvas.height);
-                // Горизонтальні лінії
+                ctx.lineTo(i * CELL_SIZE, CANVAS_HEIGHT);
                 ctx.moveTo(0, i * CELL_SIZE);
-                ctx.lineTo(canvas.width, i * CELL_SIZE);
+                ctx.lineTo(CANVAS_WIDTH, i * CELL_SIZE);
                 ctx.stroke();
             }
         }
@@ -221,29 +578,40 @@ drafts.html
         function getMousePos(event) {
             const rect = canvas.getBoundingClientRect();
             let clientX, clientY;
+            
+            const containerScrollX = window.scrollX || document.documentElement.scrollLeft;
+            const containerScrollY = window.scrollY || document.documentElement.scrollTop;
 
             if (event.touches) {
-                // Обробка дотику
                 clientX = event.touches[0].clientX;
                 clientY = event.touches[0].clientY;
             } else {
-                // Обробка миші
                 clientX = event.clientX;
                 clientY = event.clientY;
             }
+            
+            const x = clientX - rect.left - containerScrollX;
+            const y = clientY - rect.top - containerScrollY;
 
             return {
-                x: Math.floor((clientX - rect.left) / CELL_SIZE),
-                y: Math.floor((clientY - rect.top) / CELL_SIZE)
+                x: Math.floor(x / CELL_SIZE),
+                y: Math.floor(y / CELL_SIZE)
             };
         }
+        
+        let lastX = -1, lastY = -1;
 
         function drawPixel(x, y) {
             if (x >= 0 && x < GRID_DIMENSION && y >= 0 && y < GRID_DIMENSION) {
+                if (x === lastX && y === lastY) return; 
+                
                 const color = currentTool === 'pen' ? currentDrawColor : null; // null = erase
                 pixelGrid[y][x] = color;
                 redrawCanvas();
-                saveArt(currentCellKey); // Зберігаємо після кожного мазка
+                saveArt(currentItemId); 
+                
+                lastX = x;
+                lastY = y;
             }
         }
 
@@ -251,6 +619,7 @@ drafts.html
             event.preventDefault(); 
             isDrawing = true;
             const pos = getMousePos(event);
+            lastX = -1; lastY = -1; 
             drawPixel(pos.x, pos.y);
         }
 
@@ -263,182 +632,43 @@ drafts.html
 
         function handlePointerEnd(event) {
             isDrawing = false;
+            lastX = -1; lastY = -1; 
         }
 
         function toggleTool() {
             if (currentTool === 'pen') {
                 currentTool = 'eraser';
-                toggleToolBtn.textContent = '🧼 Eraser';
-                toggleToolBtn.dataset.tool = 'eraser';
-                colorPicker.style.visibility = 'hidden';
+                toggleToolBtn.innerHTML = '🧼 Ластик';
             } else {
                 currentTool = 'pen';
-                toggleToolBtn.textContent = '✏️ Pen';
-                toggleToolBtn.dataset.tool = 'pen';
-                colorPicker.style.visibility = 'visible';
+                toggleToolBtn.innerHTML = '✏️ Кисть';
             }
         }
 
-        colorPicker.addEventListener('input', (e) => {
-            currentDrawColor = e.target.value;
-            // Перемикаємо на перо, якщо обрано новий колір
-            if (currentTool === 'eraser') {
-                 toggleTool();
-            }
-        });
-
-
-        // --- Логіка Збереження та Відправки ---
-        
         function saveArt(key) {
-            try {
-                // Використовуємо localStorage для збереження стану
+            if (key) {
                 localStorage.setItem(`morstrix_art_${key}`, JSON.stringify(pixelGrid));
-            } catch (e) {
-                console.error("Помилка збереження в Local Storage:", e);
             }
         }
 
         function loadArt(key) {
+            if (!key) return initPixelGrid();
+            
             try {
                 const savedData = localStorage.getItem(`morstrix_art_${key}`);
                 if (savedData) {
                     pixelGrid = JSON.parse(savedData);
                 } else {
-                    initPixelGrid(); // Скидаємо, якщо немає збережених даних
+                    initPixelGrid(); 
                 }
             } catch (e) {
-                initPixelGrid(); // Скидаємо при помилці парсингу
-                console.error("Помилка завантаження з Local Storage:", e);
-            }
-        }
-
-        function updateCellDisplay(newKey) {
-            currentCellKey = newKey;
-            currentCellKeyElement.textContent = newKey;
-            loadArt(currentCellKey);
-            redrawCanvas();
-        }
-
-        function sendArt() {
-            // 1. Очищаємо пусті рядки і стовпці, щоб зменшити JSON payload
-            // (Цю оптимізацію можна пропустити для простоти, але краще надіслати чисту сітку)
-            
-            const payload = JSON.stringify(pixelGrid);
-            
-            // Формат даних: "ART|CELL_KEY|JSON_PAYLOAD"
-            const data = `ART|${currentCellKey}|${payload}`;
-
-            if (window.Telegram && window.Telegram.WebApp) {
-                window.Telegram.WebApp.sendData(data);
-                window.Telegram.WebApp.close();
-            } else {
-                 alert(`ART Data Sent (debug): ${data}`);
-            }
-        }
-
-        function sendPush() {
-            const dateTime = pushDateTime.value;
-            const text = pushText.value.trim();
-            const key = `PUSH_${Date.now()}`; // Унікальний ключ для нагадування
-
-            if (!dateTime) {
-                alert("Будь ласка, оберіть дату і час.");
-                return;
-            }
-            if (!text) {
-                alert("Будь ласка, введіть текст нагадування.");
-                return;
-            }
-
-            const payload = JSON.stringify({
-                text: text,
-                datetime: dateTime // Надсилаємо рядок у форматі ISO 8601
-            });
-            
-            // Формат даних: "PUSH|UNIQUE_KEY|JSON_PAYLOAD"
-            const data = `PUSH|${key}|${payload}`;
-
-            if (window.Telegram && window.Telegram.WebApp) {
-                window.Telegram.WebApp.sendData(data);
-                window.Telegram.WebApp.close();
-            } else {
-                alert(`PUSH Data Sent (debug): ${data}`);
+                initPixelGrid(); 
             }
         }
 
 
-        function saveAndClose() {
-            // Зберігаємо поточний арт перед закриттям
-            saveArt(currentCellKey);
-            
-            if (window.Telegram && window.Telegram.WebApp) {
-                window.Telegram.WebApp.close();
-            } else {
-                alert("Closed (debug)");
-            }
-        }
-
-
-        // --- Логіка Вкладок ---
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
-
-            document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
-            document.getElementById(`tab-${tabId.replace('-tab', '')}-btn`).classList.add('active');
-        }
-
-        document.getElementById('tab-art-btn').addEventListener('click', () => switchTab('art-tab'));
-        document.getElementById('tab-push-btn').addEventListener('click', () => switchTab('push-tab'));
-
-
-        // --- Ініціалізація ---
-        window.addEventListener('load', () => {
-            if (window.Telegram && window.Telegram.WebApp) {
-                window.Telegram.WebApp.ready();
-                window.Telegram.WebApp.BackButton.hide();
-            }
-            
-            // Art Init
-            generateGrid();
-            updateCellDisplay(currentCellKey); // Завантажує арт та малює
-            
-            // Push Init
-            const now = new Date();
-            // Встановлюємо мінімальне значення на теперішній час (для коректності браузерів)
-            pushDateTime.min = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-            pushDateTime.value = pushDateTime.min; 
-
-
-            // Обробники Art (підтримка як миші, так і дотику)
-            canvas.addEventListener('mousedown', handlePointerStart);
-            canvas.addEventListener('mousemove', handlePointerMove);
-            document.addEventListener('mouseup', handlePointerEnd);
-            
-            canvas.addEventListener('touchstart', handlePointerStart);
-            canvas.addEventListener('touchmove', handlePointerMove);
-            canvas.addEventListener('touchend', handlePointerEnd);
-            
-            clearArtBtn.addEventListener('click', () => {
-                if(confirm("Ви впевнені, що хочете очистити весь арт?")) {
-                    initPixelGrid();
-                    redrawCanvas();
-                    saveArt(currentCellKey);
-                }
-            });
-            
-            toggleToolBtn.addEventListener('click', toggleTool);
-
-            // Обробники кнопок
-            saveAndCloseBtn.addEventListener('click', saveAndClose);
-            sendArtBtn.addEventListener('click', sendArt); 
-            sendPushBtn.addEventListener('click', sendPush); // ✅ Обробник кнопки Push
-
-            if (window.Telegram && window.Telegram.WebApp) {
-                window.Telegram.WebApp.onEvent('backButtonClicked', saveAndClose);
-            }
-        });
+        // --- ЗАПУСК ---
+        window.addEventListener('load', initApp);
     </script>
 </body>
 </html>
