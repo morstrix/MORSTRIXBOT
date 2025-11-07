@@ -65,10 +65,10 @@ application.add_handler(ChatJoinRequestHandler(handle_join_request))
 # =================================================================
 # === 💥 ОСЬ ФІНАЛЬНЕ ВИПРАВЛЕННЯ 💥 ===
 #
-# Правильний фільтр: "filters.Message.WEB_APP_DATA"
+# Правильний фільтр: "filters.StatusUpdate.WEB_APP_DATA"
 # =================================================================
 application.add_handler(MessageHandler(
-    filters.Message.WEB_APP_DATA,
+    filters.StatusUpdate.WEB_APP_DATA,
     handle_webapp_data
 ))
 
