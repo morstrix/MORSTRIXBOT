@@ -13,6 +13,8 @@ drafts.html
             --text-color: #00ff00; /* Яскраво-зелений для тексту (Pixel) */
             --accent-color: #ff00ff; /* Маджента для акценту (Retro) */
             --cell-size: 80px;
+            --draw-color: var(--text-color); /* Колір малювання */
+            --erase-color: var(--bg-color); /* Колір стирання */
         }
 
         body {
@@ -33,6 +35,7 @@ drafts.html
         }
 
         .header {
+            /* ... (Стилі заголовка не змінені) ... */
             text-align: center;
             padding: 10px;
             background-color: var(--grid-color);
@@ -52,6 +55,7 @@ drafts.html
         }
 
         .cell {
+             /* ... (Стилі клітинки сітки не змінені) ... */
             min-height: var(--cell-size);
             background-color: var(--bg-color);
             border: 1px solid var(--grid-color);
@@ -79,12 +83,13 @@ drafts.html
 
         /* Стилі для модального вікна */
         .modal {
+            /* ... (Стилі модального вікна не змінені) ... */
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.98); /* Трохи прозоріше для ефекту */
+            background: rgba(0, 0, 0, 0.98); 
             display: none; 
             justify-content: center;
             align-items: center;
@@ -93,9 +98,10 @@ drafts.html
         }
 
         .modal-content {
+            /* ... (Стилі вмісту модального вікна не змінені) ... */
             width: 95%;
             max-width: 600px;
-            height: 80vh; /* Збільшуємо висоту */
+            height: 80vh; 
             background: var(--bg-color);
             border: 2px solid var(--text-color);
             padding: 20px;
@@ -104,7 +110,44 @@ drafts.html
             flex-direction: column;
         }
         
-        /* КОНТЕЙНЕР ДЛЯ НОТАТОК (НОВИЙ) */
+        /* ТАБИ */
+        .tab-controls {
+            display: flex;
+            margin-bottom: 15px;
+        }
+
+        .tab-btn {
+            background-color: var(--grid-color);
+            color: #fff;
+            border: 2px solid var(--grid-color);
+            padding: 8px 15px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 12px;
+            box-shadow: 2px 2px 0 #000;
+            flex-grow: 1;
+            margin: 0 5px;
+        }
+
+        .tab-btn.active {
+            background-color: var(--text-color);
+            color: var(--bg-color);
+            border-color: var(--text-color);
+        }
+        
+        .tab-content {
+            flex-grow: 1;
+            overflow-y: hidden; /* Основний контент керує своїм прокручуванням */
+            display: none;
+            padding: 10px 0;
+        }
+        
+        .tab-content.active {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Стилі для секції "Нотатки" */
         .note-list-container {
             flex-grow: 1;
             overflow-y: auto;
@@ -115,34 +158,32 @@ drafts.html
         }
 
         .note-item {
+             /* ... (Стилі елемента нотатки не змінені) ... */
             margin-bottom: 5px;
             padding: 5px;
             border-bottom: 1px dotted var(--text-color);
             font-size: 14px;
             word-break: break-all;
-            white-space: pre-wrap; /* Зберігає форматування тексту */
+            white-space: pre-wrap;
         }
         
-        .note-item:last-child {
-            border-bottom: none;
-        }
-
         textarea {
+            /* ... (Стилі textarea не змінені) ... */
             width: 100%;
-            height: 100px; /* Зменшуємо висоту для нового вводу */
+            height: 100px;
             background-color: #000000;
             color: var(--text-color);
             border: 1px solid var(--grid-color);
             padding: 10px;
             box-sizing: border-box;
-            resize: vertical; /* Дозволяємо лише вертикальну зміну розміру */
+            resize: vertical;
             font-family: monospace;
             font-size: 14px;
             margin-bottom: 10px;
         }
         
-        /* Кнопка додавання нової нотатки */
         .add-note-btn {
+             /* ... (Стилі кнопки додавання нотатки не змінені) ... */
             background-color: #004d40;
             color: #fff;
             border: none;
@@ -154,43 +195,53 @@ drafts.html
             margin-bottom: 10px;
         }
         
-        .add-note-btn:hover {
-            background-color: var(--text-color);
-            color: var(--bg-color);
-        }
-
-        .button-group {
+        /* Стилі для секції "Арт" */
+        #art-container {
             display: flex;
-            justify-content: space-between;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex-grow: 1;
+        }
+        
+        #pixel-canvas {
+            border: 2px solid var(--text-color);
+            box-shadow: 4px 4px 0 var(--accent-color);
+            image-rendering: pixelated;
+            touch-action: none; /* Забороняємо стандартний скрол на канвасі */
+        }
+        
+        .art-controls {
+            margin-top: 10px;
+            display: flex;
             gap: 10px;
-            margin-top: auto; /* Притискаємо до низу */
         }
 
-        .close-btn, .save-btn, .send-btn {
+        .art-btn {
             background-color: var(--accent-color);
             color: var(--bg-color);
             border: none;
-            padding: 10px 15px;
+            padding: 5px 10px;
             cursor: pointer;
             font-family: inherit;
             font-size: 12px;
             box-shadow: 2px 2px 0 #000;
-            flex-grow: 1; 
-        }
-        
-        .save-btn {
-            background-color: var(--text-color);
         }
 
-        .send-btn {
-            background-color: #ff9900;
+        .button-group {
+             /* ... (Стилі групи кнопок не змінені) ... */
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: auto;
         }
+
     </style>
 </head>
 <body>
 
     <div class="header">
-        MORSTRIX ARCHIVE V2.0
+        MORSTRIX ARCHIVE V2.1
     </div>
 
     <div id="grid-container" class="grid-container">
@@ -200,36 +251,70 @@ drafts.html
         <div class="modal-content">
             <h2 id="modalTitle">Кімната [X, Y]</h2>
             
-            <div id="noteListContainer" class="note-list-container">
+            <div class="tab-controls">
+                <button id="tabNotesBtn" class="tab-btn active">НОТАТКИ</button>
+                <button id="tabArtBtn" class="tab-btn">АРТ (8x8)</button>
+            </div>
+            
+            <div id="notesTab" class="tab-content active">
+                <div id="noteListContainer" class="note-list-container">
+                    </div>
+                
+                <textarea id="noteContent" placeholder="Введіть нову нотатку (один запис)..."></textarea>
+                <button id="addNoteBtn" class="add-note-btn">ДОДАТИ НОТАТКУ</button>
+            </div>
+            
+            <div id="artTab" class="tab-content">
+                <div id="art-container">
+                    <canvas id="pixel-canvas" width="256" height="256"></canvas>
+                    <div class="art-controls">
+                        <button id="clearArtBtn" class="art-btn">ОЧИСТИТИ</button>
+                        <button id="toggleColorBtn" class="art-btn">КОЛІР: <span id="currentColorIndicator" style="color: var(--draw-color);">**ЯСКРАВИЙ**</span></button>
+                    </div>
                 </div>
-            
-            <textarea id="noteContent" placeholder="Введіть нову нотатку або арт (один запис)..."></textarea>
-            
-            <button id="addNoteBtn" class="add-note-btn">ДОДАТИ НОТАТКУ</button>
+            </div>
 
             <div class="button-group">
                 <button id="saveNoteBtn" class="save-btn">ЗБЕРЕГТИ ВСЕ</button>
-                <button id="sendNoteBtn" class="send-btn">НАДІСЛАТИ ОСТАННЄ</button>
+                <button id="sendNoteBtn" class="send-btn">НАДІСЛАТИ</button>
                 <button id="closeModalBtn" class="close-btn">ЗАКРИТИ</button>
             </div>
         </div>
     </div>
 
     <script>
-        const GRID_ROWS = 7; // 7 РЯДКІВ
-        const GRID_COLS = 4; // 4 КОЛОНКИ
+        const GRID_ROWS = 7;
+        const GRID_COLS = 4;
+        const ART_GRID_SIZE = 8; // 8x8 пікселів
+        const PIXEL_SIZE = 256 / ART_GRID_SIZE; // Розмір клітинки на Canvas (256x256 / 8 = 32)
+
         const gridContainer = document.getElementById('grid-container');
         const noteModal = document.getElementById('noteModal');
         const modalTitle = document.getElementById('modalTitle');
-        const noteContentInput = document.getElementById('noteContent'); // Змінено назву
-        const noteListContainer = document.getElementById('noteListContainer'); // Новий елемент
-        const addNoteBtn = document.getElementById('addNoteBtn'); // Нова кнопка
+        const noteContentInput = document.getElementById('noteContent'); 
+        const noteListContainer = document.getElementById('noteListContainer'); 
+        const addNoteBtn = document.getElementById('addNoteBtn'); 
         const saveNoteBtn = document.getElementById('saveNoteBtn');
         const sendNoteBtn = document.getElementById('sendNoteBtn');
         const closeModalBtn = document.getElementById('closeModalBtn');
-
+        
+        // Елементи табів
+        const tabNotesBtn = document.getElementById('tabNotesBtn');
+        const tabArtBtn = document.getElementById('tabArtBtn');
+        const notesTab = document.getElementById('notesTab');
+        const artTab = document.getElementById('artTab');
+        
+        // Елементи арту
+        const canvas = document.getElementById('pixel-canvas');
+        const ctx = canvas.getContext('2d');
+        const clearArtBtn = document.getElementById('clearArtBtn');
+        const toggleColorBtn = document.getElementById('toggleColorBtn');
+        const currentColorIndicator = document.getElementById('currentColorIndicator');
+        
         let currentCellKey = null;
         let allNotes = loadNotes();
+        let pixelGrid = []; // Масив для зберігання стану пікселів
+        let drawingColor = getComputedStyle(document.documentElement).getPropertyValue('--draw-color').trim(); // Початковий колір
 
         // ----------------------------------------------------
         // 💾 LOCAL STORAGE ФУНКЦІЇ
@@ -237,7 +322,7 @@ drafts.html
 
         function loadNotes() {
             try {
-                const data = localStorage.getItem('morstrix_drafts_v2'); // Змінено ключ
+                const data = localStorage.getItem('morstrix_drafts_v2'); 
                 return data ? JSON.parse(data) : {};
             } catch (e) {
                 console.error("Помилка завантаження LocalStorage:", e);
@@ -260,33 +345,122 @@ drafts.html
         }
         
         // ----------------------------------------------------
-        // 🏗️ ГЕНЕРАЦІЯ СІТКИ ТА ЛОГІКА
+        // 🖼️ ЛОГІКА ПІКСЕЛЬНОГО АРТУ
         // ----------------------------------------------------
 
-        function generateGrid() {
-            gridContainer.innerHTML = '';
-            for (let row = 1; row <= GRID_ROWS; row++) {
-                for (let col = 1; col <= GRID_COLS; col++) {
-                    const cellKey = `cell_${row}_${col}`;
-                    const cellDiv = document.createElement('div');
-                    cellDiv.className = 'cell';
-                    cellDiv.dataset.key = cellKey;
-                    
-                    // Перевіряємо, чи є нотатки для цієї клітинки (тепер це масив)
-                    const noteArray = allNotes[cellKey];
-                    const count = noteArray ? noteArray.length : 0;
-                    const hasNote = count > 0;
+        function initPixelGrid() {
+            // Ініціалізуємо порожню сітку
+            pixelGrid = Array(ART_GRID_SIZE).fill(0).map(() => 
+                Array(ART_GRID_SIZE).fill(getComputedStyle(document.documentElement).getPropertyValue('--erase-color').trim())
+            );
+        }
 
-                    cellDiv.innerHTML = `[${row}, ${col}] ${hasNote ? `<div class="note-indicator">⚡️(${count})</div>` : ''}`;
-                    cellDiv.addEventListener('click', () => openCell(cellKey, row, col));
-                    gridContainer.appendChild(cellDiv);
+        function loadArt(cellKey) {
+            initPixelGrid(); // Скидаємо перед завантаженням
+            const cellData = allNotes[cellKey] || {};
+            // Art зберігається як об'єкт {type: 'art', data: pixelArray}
+            const artData = cellData.art; 
+            
+            if (artData && artData.length === ART_GRID_SIZE && artData[0].length === ART_GRID_SIZE) {
+                pixelGrid = artData;
+            }
+            redrawCanvas();
+        }
+        
+        function saveArt(cellKey) {
+            // Зберігаємо сітку пікселів, якщо вона не порожня
+            const isBlank = pixelGrid.flat().every(color => color === getComputedStyle(document.documentElement).getPropertyValue('--erase-color').trim());
+            
+            if (isBlank) {
+                if (allNotes[cellKey]) {
+                    delete allNotes[cellKey].art;
+                    if (Object.keys(allNotes[cellKey]).length === 0) {
+                        delete allNotes[cellKey];
+                    }
                 }
+            } else {
+                if (!allNotes[cellKey]) allNotes[cellKey] = {};
+                allNotes[cellKey].art = pixelGrid;
             }
         }
 
+        function redrawCanvas() {
+            const eraseColor = getComputedStyle(document.documentElement).getPropertyValue('--erase-color').trim();
+            for (let r = 0; r < ART_GRID_SIZE; r++) {
+                for (let c = 0; c < ART_GRID_SIZE; c++) {
+                    ctx.fillStyle = pixelGrid[r][c] || eraseColor;
+                    ctx.fillRect(c * PIXEL_SIZE, r * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
+                    
+                    // Малюємо сітку темно-зеленим кольором
+                    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--grid-color').trim();
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(c * PIXEL_SIZE, r * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
+                }
+            }
+        }
+        
+        function getCoords(e) {
+            const rect = canvas.getBoundingClientRect();
+            let x, y;
+
+            if (e.touches && e.touches.length > 0) {
+                x = e.touches[0].clientX - rect.left;
+                y = e.touches[0].clientY - rect.top;
+            } else {
+                x = e.clientX - rect.left;
+                y = e.clientY - rect.top;
+            }
+            
+            // Визначаємо піксель у сітці
+            const col = Math.floor(x / PIXEL_SIZE);
+            const row = Math.floor(y / PIXEL_SIZE);
+            
+            return { row, col };
+        }
+        
+        function handleDraw(e) {
+            e.preventDefault();
+            const { row, col } = getCoords(e);
+            
+            if (row >= 0 && row < ART_GRID_SIZE && col >= 0 && col < ART_GRID_SIZE) {
+                 // Перемикання: якщо клітинка вже зафарбована, стираємо
+                const eraseColor = getComputedStyle(document.documentElement).getPropertyValue('--erase-color').trim();
+                const newColor = (pixelGrid[row][col] === drawingColor) ? eraseColor : drawingColor;
+
+                pixelGrid[row][col] = newColor;
+                redrawCanvas();
+                saveArt(currentCellKey); // Автоматичне збереження арту
+            }
+        }
+
+        // ----------------------------------------------------
+        // 🗂️ ЛОГІКА ТАБІВ ТА ІНТЕРФЕЙСУ
+        // ----------------------------------------------------
+
+        function switchTab(tabId) {
+            // Деактивуємо всі
+            tabNotesBtn.classList.remove('active');
+            tabArtBtn.classList.remove('active');
+            notesTab.classList.remove('active');
+            artTab.classList.remove('active');
+            
+            // Активуємо потрібний
+            if (tabId === 'notes') {
+                tabNotesBtn.classList.add('active');
+                notesTab.classList.add('active');
+            } else if (tabId === 'art') {
+                tabArtBtn.classList.add('active');
+                artTab.classList.add('active');
+                loadArt(currentCellKey); // Завантажуємо арт при переході
+            }
+        }
+        
+        // ... (Функції renderNoteList, addNote, deleteNote залишаються майже незмінними) ...
+        
         function renderNoteList(cellKey) {
             noteListContainer.innerHTML = '';
-            const notes = allNotes[cellKey] || [];
+            // Нотатки тепер зберігаються у allNotes[cellKey].notes
+            const notes = allNotes[cellKey] && allNotes[cellKey].notes ? allNotes[cellKey].notes : [];
             
             if (notes.length === 0) {
                 noteListContainer.innerHTML = '<div style="color: #999; text-align: center; margin-top: 20px;">Нотаток немає. Додайте першу!</div>';
@@ -296,20 +470,22 @@ drafts.html
             notes.forEach((note, index) => {
                 const noteItem = document.createElement('div');
                 noteItem.className = 'note-item';
-                // Відображаємо нотатку та додаємо кнопку видалення
                 noteItem.innerHTML = `<span style="color: var(--accent-color);">${index + 1}.</span> ${note} <button onclick="deleteNote('${cellKey}', ${index})" style="float: right; background: red; color: white; border: none; padding: 2px 5px; cursor: pointer; font-family: monospace;">X</button>`;
                 noteListContainer.appendChild(noteItem);
             });
         }
         
-        // Глобальна функція для видалення нотатки
         window.deleteNote = (cellKey, index) => {
-            if (allNotes[cellKey] && allNotes[cellKey].length > index) {
-                allNotes[cellKey].splice(index, 1);
+            if (allNotes[cellKey] && allNotes[cellKey].notes && allNotes[cellKey].notes.length > index) {
+                allNotes[cellKey].notes.splice(index, 1);
                 
-                // Якщо масив порожній, видаляємо ключ клітинки
-                if (allNotes[cellKey].length === 0) {
-                    delete allNotes[cellKey];
+                if (allNotes[cellKey].notes.length === 0) {
+                    delete allNotes[cellKey].notes;
+                }
+                
+                // Видаляємо клітинку, якщо вона повністю порожня
+                if (Object.keys(allNotes[cellKey]).length === 0) {
+                     delete allNotes[cellKey];
                 }
                 
                 renderNoteList(cellKey);
@@ -318,12 +494,34 @@ drafts.html
             }
         };
 
+        function addNote() {
+            if (currentCellKey) {
+                const content = noteContentInput.value.trim();
+                if (content === '') {
+                    alert("Введіть текст нотатки перед додаванням.");
+                    return;
+                }
+                
+                if (!allNotes[currentCellKey]) allNotes[currentCellKey] = {};
+                if (!allNotes[currentCellKey].notes) allNotes[currentCellKey].notes = [];
+                
+                allNotes[currentCellKey].notes.push(content);
+                noteContentInput.value = '';
+                renderNoteList(currentCellKey);
+                updateCellDisplay(currentCellKey); 
+                saveNotes();
+            }
+        }
+
         function openCell(cellKey, row, col) {
             currentCellKey = cellKey;
             modalTitle.textContent = `Кімната [${row}, ${col}]`;
             
-            noteContentInput.value = ''; // Очищуємо поле вводу
-            renderNoteList(cellKey); // Відображаємо поточний список нотаток
+            noteContentInput.value = ''; 
+            renderNoteList(cellKey); 
+            
+            // За замовчуванням відкриваємо вкладку "Нотатки"
+            switchTab('notes');
             
             noteModal.style.display = 'flex';
             
@@ -333,41 +531,27 @@ drafts.html
             }
         }
         
-        function addNote() {
-            if (currentCellKey) {
-                const content = noteContentInput.value.trim();
-                if (content === '') {
-                    alert("Введіть текст нотатки або арт перед додаванням.");
-                    return;
-                }
-                
-                // Ініціалізуємо масив, якщо він ще не існує
-                if (!allNotes[currentCellKey]) {
-                    allNotes[currentCellKey] = [];
-                }
-                
-                allNotes[currentCellKey].push(content);
-                noteContentInput.value = ''; // Очищуємо поле
-                renderNoteList(currentCellKey); // Оновлюємо список
-                updateCellDisplay(currentCellKey); // Оновлюємо вигляд сітки
-                saveNotes(); // Зберігаємо
-            }
-        }
-
         function updateCellDisplay(cellKey) {
             const row = cellKey.split('_')[1];
             const col = cellKey.split('_')[2];
             const currentCellDiv = document.querySelector(`.cell[data-key="${cellKey}"]`);
             if (currentCellDiv) {
-                const count = allNotes[cellKey] ? allNotes[cellKey].length : 0;
-                const hasNote = count > 0;
-                currentCellDiv.innerHTML = `[${row}, ${col}] ${hasNote ? `<div class="note-indicator">⚡️(${count})</div>` : ''}`;
+                const cellData = allNotes[cellKey] || {};
+                const noteCount = cellData.notes ? cellData.notes.length : 0;
+                const hasArt = !!cellData.art;
+                const hasContent = noteCount > 0 || hasArt;
+
+                let indicator = '';
+                if (noteCount > 0) indicator += `📝(${noteCount})`;
+                if (hasArt) indicator += (noteCount > 0 ? ' + ' : '') + '🎨';
+                if (hasContent) indicator = `<div class="note-indicator">⚡️ ${indicator}</div>`;
+
+                currentCellDiv.innerHTML = `[${row}, ${col}] ${indicator}`;
             }
         }
 
         function saveAllAndClose() {
-            // У V2.0 збереження відбувається автоматично при 'addNote' та 'deleteNote'
-            // Тут просто закриваємо
+             // Збереження арту вже відбувається автоматично в handleDraw
             currentCellKey = null;
             closeModal();
         }
@@ -382,34 +566,40 @@ drafts.html
 
         function sendNote() {
             if (currentCellKey) {
-                const notes = allNotes[currentCellKey] || [];
-                if (notes.length === 0) {
-                    alert("У цій кімнаті немає нотаток для надсилання.");
+                const cellData = allNotes[currentCellKey] || {};
+                let dataToSend = '';
+                let successMessage = '';
+                
+                if (cellData.notes && cellData.notes.length > 0) {
+                    // Надсилаємо останню нотатку
+                    dataToSend = cellData.notes.pop();
+                    successMessage = `НОТАТКА [${currentCellKey}]`;
+                    if (cellData.notes.length === 0) delete cellData.notes;
+                } else if (cellData.art) {
+                    // Надсилаємо JSON-рядок арту
+                    dataToSend = JSON.stringify(cellData.art);
+                    successMessage = `АРТ [${currentCellKey}]`;
+                    delete cellData.art;
+                } else {
+                    alert("У цій кімнаті немає вмісту для надсилання.");
                     return;
                 }
                 
-                // Надсилаємо останню нотатку (або об'єднаний текст)
-                const lastNote = notes[notes.length - 1]; 
+                if (Object.keys(cellData).length === 0) delete allNotes[currentCellKey];
+                saveNotes();
                 
                 if (window.Telegram && window.Telegram.WebApp) {
-                    // Надсилаємо останню нотатку
-                    window.Telegram.WebApp.sendData(lastNote);
-                    // Видаляємо її після успішної відправки
-                    allNotes[currentCellKey].pop();
-                    if (allNotes[currentCellKey].length === 0) {
-                         delete allNotes[currentCellKey];
-                    }
-                    saveNotes();
-                    closeModal();
-                    
-                    if (window.Telegram.WebApp.isClosing) return; // Уникнути помилки, якщо додаток вже закривається
-                    updateCellDisplay(currentCellKey);
-                    
+                    window.Telegram.WebApp.sendData(successMessage + '|' + dataToSend); 
+                    // Відправка з префіксом 'НОТАТКА|' або 'АРТ|' для легшої обробки ботом
+                    window.Telegram.WebApp.close();
                 } else {
                     alert("Помилка: Не вдалося знайти Telegram WebApp API.");
                 }
+                
+                updateCellDisplay(currentCellKey);
             }
         }
+
 
         // ----------------------------------------------------
         // ⚡️ ІНІЦІАЛІЗАЦІЯ
@@ -421,17 +611,51 @@ drafts.html
                 window.Telegram.WebApp.BackButton.hide();
             }
             generateGrid();
+            initPixelGrid(); // Ініціалізуємо сітку арту
+            redrawCanvas(); // Малюємо порожній канвас
+
+            // Обробники табів
+            tabNotesBtn.addEventListener('click', () => switchTab('notes'));
+            tabArtBtn.addEventListener('click', () => switchTab('art'));
+            
+            // Обробники арту
+            canvas.addEventListener('click', handleDraw);
+            canvas.addEventListener('touchstart', handleDraw);
+            canvas.addEventListener('touchmove', handleDraw);
+            
+            clearArtBtn.addEventListener('click', () => {
+                initPixelGrid();
+                redrawCanvas();
+                saveArt(currentCellKey);
+                updateCellDisplay(currentCellKey);
+            });
+            
+            toggleColorBtn.addEventListener('click', () => {
+                // Просто перемикаємо між двома кольорами для спрощення
+                const drawColor = getComputedStyle(document.documentElement).getPropertyValue('--draw-color').trim();
+                const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent-color').trim();
+                
+                if (drawingColor === drawColor) {
+                    drawingColor = accentColor;
+                    currentColorIndicator.textContent = '**АКЦЕНТ**';
+                    currentColorIndicator.style.color = accentColor;
+                } else {
+                    drawingColor = drawColor;
+                    currentColorIndicator.textContent = '**ЯСКРАВИЙ**';
+                    currentColorIndicator.style.color = drawColor;
+                }
+            });
+
+            // Обробники кнопок
+            addNoteBtn.addEventListener('click', addNote);
+            saveNoteBtn.addEventListener('click', saveAllAndClose);
+            sendNoteBtn.addEventListener('click', sendNote); 
+            closeModalBtn.addEventListener('click', closeModal); 
+
+            if (window.Telegram && window.Telegram.WebApp) {
+                window.Telegram.WebApp.onEvent('backButtonClicked', saveAllAndClose);
+            }
         });
-
-        addNoteBtn.addEventListener('click', addNote);
-        saveNoteBtn.addEventListener('click', saveAllAndClose);
-        sendNoteBtn.addEventListener('click', sendNote); 
-        closeModalBtn.addEventListener('click', closeModal); 
-
-        // Додаємо обробник для кнопки "Назад" у Telegram
-        if (window.Telegram && window.Telegram.WebApp) {
-            window.Telegram.WebApp.onEvent('backButtonClicked', saveAllAndClose);
-        }
     </script>
 </body>
 </html>
