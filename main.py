@@ -2,6 +2,7 @@
 
 import os
 import json
+import asyncio # <--- НОВИЙ ІМПОРТ
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
     ChatJoinRequestHandler, CallbackQueryHandler, ConversationHandler, JobQueue
@@ -134,15 +135,13 @@ async def setup_webhook():
         print("RENDER_EXTERNAL_URL або TELEGRAM_BOT_TOKEN не встановлено. Вебхук не налаштовано.")
 
 def main():
-    # --- ВИДАЛЕНО: application.job_queue = job_queue, оскільки він вже встановлений в Application.builder() ---
-
     if os.getenv("RENDER") == "true":
         print("Запуск в режимі Webhook (Render)...")
         
         # Налаштовуємо та запускаємо вебхук асинхронно
-        loop = application.loop
         try:
-            loop.run_until_complete(setup_webhook())
+            # ВИПРАВЛЕНО: Використовуємо asyncio.run() для запуску асинхронної setup_webhook
+            asyncio.run(setup_webhook())
         except Exception as e:
             print(f"Помилка під час асинхронного запуску setup_webhook: {e}")
             
