@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: MORSTRIXBOT
+    env: python
+    region: oregon
+    plan: free
+    pythonVersion: "3.11"
+    buildCommand: pip install -r requirements.txt && pip install "python-telegram-bot[webhooks,job-queue]"
+    startCommand: python main.py
+    envVars:
+      RENDER: "true"
