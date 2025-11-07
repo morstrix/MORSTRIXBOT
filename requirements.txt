@@ -7,3 +7,4 @@ pytz
 python-dotenv
 flask
 Pillow
+aiohttp
