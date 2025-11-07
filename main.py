@@ -160,7 +160,10 @@ async def start_webhook_server(application: Application):
     # Добавляем объект Application и Bot в контекст aiohttp
     app['bot_app'] = application
     
-    # 4. Установка Webhook
+    # 4. Ініціалізація додатка
+    await application.initialize()
+    
+    # 5. Установка Webhook
     if RENDER_EXTERNAL_URL:
         base_url = RENDER_EXTERNAL_URL.rstrip('/')
         full_webhook_url = f"{base_url}{webhook_path}"
@@ -173,16 +176,17 @@ async def start_webhook_server(application: Application):
         )
         print("Вебхук успешно установлен.")
     
-    # 5. Запуск сервера
+    # 6. Запуск сервера
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', PORT)
     print(f"Запуск aiohttp Webhook Server на порту {PORT}")
     await site.start()
     
-    # Бесконечный цикл, пока bot_app работает (Утримуємо асинхронний процес активним)
+    # Запуск додатка (включає JobQueue)
     await application.start()
-    # 💥 ФІКС: Замість start_polling() очікуємо на нескінченний Future, щоб тримати процес активним
+    
+    # Бесконечный цикл, щоб тримати процес активним
     await asyncio.Future() 
 
 # ----------------------------------------------------\
@@ -192,12 +196,10 @@ async def start_webhook_server(application: Application):
 def main():
     if os.getenv("RENDER") == "true":
         print("Запуск в режиме Webhook (Render)...")
-        application.job_queue.start() # Запускаем JobQueue для Webhook
         # Запускаем асинхронный сервер
         asyncio.run(start_webhook_server(application))
     else:
         print("Запуск бота в режиме опроса (Polling).")
-        application.job_queue.start() # Запускаем JobQueue для Polling
         application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
