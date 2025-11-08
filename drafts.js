@@ -1,400 +1,173 @@
 const WebApp = window.Telegram.WebApp;
-let currentCatalogId = null;
-let currentItemId = null;
-let dataStore = { catalogs: {} };
-let canvas, ctx, colorPicker;
-let pixelGrid = [];
+
+// === КОНФІГ ===
+const GRID = 16;
+const CELL = 20; // розмір пікселя в UI
+const CANVAS_SIZE = GRID * CELL;
+
+// === СТАН ===
+let canvas, ctx;
+let pixelGrid = Array(GRID).fill().map(() => Array(GRID).fill(null));
 let isDrawing = false;
-let currentDrawColor = '#ffffff';
-let currentTool = 'pen';
-const GRID_DIMENSION = 16;
-const CELL_SIZE = 15;
-const CANVAS_WIDTH = GRID_DIMENSION * CELL_SIZE;
-const CANVAS_HEIGHT = CANVAS_WIDTH;
+let currentColor = '#ffffff';
+let currentTool = 'pen'; // 'pen' | 'eraser'
 
-// === ПОКАЗ В'ЮШОК ===
-function showView(viewId) {
-    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-    document.getElementById(viewId).classList.add('active');
-}
-
-// === КАТАЛОГИ ===
-function showCatalogList() {
-    showView('catalog-list-view');
-    renderCatalogs();
-}
-
-function showCatalogCreator() {
-    showView('catalog-editor-view');
-    document.getElementById('catalog-name-input').value = '';
-    currentCatalogId = null; // Новий каталог
-}
-
-function saveCatalog() {
-    const name = document.getElementById('catalog-name-input').value.trim();
-    if (!name) return alert("Введіть назву каталогу");
-
-    if (!currentCatalogId) {
-        // Створення нового
-        currentCatalogId = Date.now().toString();
-        dataStore.catalogs[currentCatalogId] = { name, items: {} };
-    } else {
-        // Редагування
-        dataStore.catalogs[currentCatalogId].name = name;
-    }
-
-    saveDataStore();
-    showCatalogList();
-}
-
-function editCatalog(id) {
-    currentCatalogId = id;
-    const cat = dataStore.catalogs[id];
-    document.getElementById('catalog-name-input').value = cat.name;
-    showView('catalog-editor-view');
-}
-
-function deleteCatalog(id) {
-    if (confirm("Видалити каталог і всі елементи?")) {
-        delete dataStore.catalogs[id];
-        saveDataStore();
-        renderCatalogs();
-    }
-}
-
-function renderCatalogs() {
-    const container = document.getElementById('catalogs-container');
-    container.innerHTML = '';
-    for (const [id, cat] of Object.entries(dataStore.catalogs)) {
-        const btn = document.createElement('button');
-        btn.className = 'item-button';
-        btn.innerHTML = `
-            ${cat.name} 
-            <span>${Object.keys(cat.items).length}</span>
-            <small style="float:right; opacity:0.6; margin-left:5px;">✏️</small>
-        `;
-        btn.onclick = (e) => {
-            if (e.target.tagName === 'SMALL') {
-                editCatalog(id);
-            } else {
-                openCatalog(id);
-            }
-        };
-        container.appendChild(btn);
-
-        // Кнопка видалення
-        const delBtn = document.createElement('button');
-        delBtn.textContent = '🗑️';
-        delBtn.style.cssText = 'float:right; background:none; border:none; font-size:12px; cursor:pointer;';
-        delBtn.onclick = (e) => {
-            e.stopPropagation();
-            deleteCatalog(id);
-        };
-        btn.appendChild(delBtn);
-    }
-}
-
-function openCatalog(id) {
-    currentCatalogId = id;
-    showView('item-list-view');
-    renderItems();
-}
-
-// === ЕЛЕМЕНТИ ===
-function showItemCreator() {
-    showView('item-creator-view');
-}
-
-function showItemList() {
-    showView('item-list-view');
-    renderItems();
-}
-
-function renderItems() {
-    const container = document.getElementById('items-container');
-    container.innerHTML = '';
-    const items = dataStore.catalogs[currentCatalogId]?.items || {};
-    for (const [id, item] of Object.entries(items)) {
-        const btn = document.createElement('button');
-        btn.className = 'item-button';
-        btn.innerHTML = `${item.name} <span>${item.type}</span>`;
-        btn.onclick = () => openItem(id);
-        container.appendChild(btn);
-    }
-}
-
-function openItem(id) {
-    currentItemId = id;
-    const item = dataStore.catalogs[currentCatalogId].items[id];
-    if (item.type === 'note') showNoteEditor();
-    else if (item.type === 'push') showPushEditor();
-    else if (item.type === 'art') showArtEditor();
-}
-
-// === ЗАМІТКА ===
-function showNoteEditor() {
-    showView('note-editor-view');
-    if (currentItemId) {
-        const item = dataStore.catalogs[currentCatalogId].items[currentItemId];
-        document.getElementById('note-name-input').value = item.name;
-        document.getElementById('note-text-input').value = item.text || '';
-    } else {
-        document.getElementById('note-name-input').value = '';
-        document.getElementById('note-text-input').value = '';
-    }
-}
-
-function saveNote() {
-    const name = document.getElementById('note-name-input').value.trim();
-    const text = document.getElementById('note-text-input').value;
-    if (!name) return alert("Введіть назву");
-    
-    if (!currentItemId) {
-        currentItemId = Date.now().toString();
-        dataStore.catalogs[currentCatalogId].items[currentItemId] = { type: 'note', name };
-    }
-    dataStore.catalogs[currentCatalogId].items[currentItemId].text = text;
-    saveDataStore();
-    showItemList();
-}
-
-// === НАГАДУВАННЯ ===
-function showPushEditor() {
-    showView('push-editor-view');
-    if (currentItemId) {
-        const item = dataStore.catalogs[currentCatalogId].items[currentItemId];
-        document.getElementById('push-name-input').value = item.name;
-        document.getElementById('push-datetime-input').value = item.datetime || '';
-        document.getElementById('push-text-input').value = item.text || '';
-    } else {
-        document.getElementById('push-name-input').value = '';
-        document.getElementById('push-datetime-input').value = '';
-        document.getElementById('push-text-input').value = '';
-    }
-}
-
-function savePush() {
-    const name = document.getElementById('push-name-input').value.trim();
-    const datetime = document.getElementById('push-datetime-input').value;
-    const text = document.getElementById('push-text-input').value;
-    if (!name || !datetime) return alert("Заповніть усі поля");
-    
-    if (!currentItemId) {
-        currentItemId = Date.now().toString();
-        dataStore.catalogs[currentCatalogId].items[currentItemId] = { type: 'push', name, datetime };
-    }
-    dataStore.catalogs[currentCatalogId].items[currentItemId].text = text;
-    saveDataStore();
-
-    const payload = JSON.stringify({ text, datetime });
-    const data = `PUSH|${currentCatalogId}_${currentItemId}|${payload}`;
-    if (WebApp) {
-        WebApp.sendData(data);
-        WebApp.close();
-    }
-    showItemList();
-}
-
-// === ПІКСЕЛЬ-АРТ ===
-function showArtEditor() {
-    showView('art-editor-view');
-    initArtEditor();
-    if (currentItemId) {
-        document.getElementById('art-name-input').value = dataStore.catalogs[currentCatalogId].items[currentItemId].name;
-        loadArt(currentItemId);
-    } else {
-        document.getElementById('art-name-input').value = '';
-        initPixelGrid();
-        redrawCanvas();
-    }
-}
-
-function saveArtItem() {
-    const name = document.getElementById('art-name-input').value.trim();
-    if (!name) return alert("Введіть назву арту");
-    
-    if (!currentItemId) {
-        currentItemId = Date.now().toString();
-        dataStore.catalogs[currentCatalogId].items[currentItemId] = { type: 'art', name };
-    } else {
-        dataStore.catalogs[currentCatalogId].items[currentItemId].name = name;
-    }
-    saveArt(currentItemId);
-    saveDataStore();
-    alert("Арт збережено!");
-}
-
-function sendArt() {
-    saveArtItem(); 
-    if (!currentItemId) return alert("Спочатку збережіть арт.");
-    const artData = localStorage.getItem(`morstrix_art_${currentItemId}`);
-    if (!artData || artData === JSON.stringify(Array(GRID_DIMENSION).fill().map(() => Array(GRID_DIMENSION).fill(null))))) {
-        return alert("Арт пустий.");
-    }
-    const data = `ART|${currentCatalogId}_${currentItemId}|${artData}`;
-    if (WebApp) {
-        WebApp.sendData(data);
-        WebApp.close();
-    } else {
-        alert(`ART Data Sent (debug): ${data.substring(0, 100)}...`);
-    }
-}
-
-function initArtEditor() {
+// === ІНІЦІАЛІЗАЦІЯ ===
+function init() {
     canvas = document.getElementById('pixel-canvas');
     ctx = canvas.getContext('2d');
-    colorPicker = document.getElementById('color-picker');
-    canvas.width = CANVAS_WIDTH;
-    canvas.height = CANVAS_HEIGHT;
-    
-    initPixelGrid();
-    redrawCanvas();
+    canvas.width = CANVAS_SIZE;
+    canvas.height = CANVAS_SIZE;
 
-    // Очищаємо попередні обробники
-    const newCanvas = canvas.cloneNode(true);
-    canvas.parentNode.replaceChild(newCanvas, canvas);
-    canvas = newCanvas;
-    ctx = canvas.getContext('2d');
+    // Масштабування під екран
+    const container = document.getElementById('canvas-container');
+    const scale = Math.min(
+        (window.innerWidth * 0.9) / CANVAS_SIZE,
+        (window.innerHeight * 0.7) / CANVAS_SIZE
+    );
+    const scaledSize = CANVAS_SIZE * scale;
+    container.style.width = scaledSize + 'px';
+    container.style.height = scaledSize + 'px';
 
-    canvas.addEventListener('mousedown', handlePointerStart);
-    canvas.addEventListener('mousemove', handlePointerMove);
-    document.addEventListener('mouseup', handlePointerEnd);
-    canvas.addEventListener('touchstart', handlePointerStart, { passive: false });
-    canvas.addEventListener('touchmove', handlePointerMove, { passive: false });
-    canvas.addEventListener('touchend', handlePointerEnd);
+    loadArt();
+    drawGrid();
+    setupEvents();
+}
 
-    colorPicker.addEventListener('input', (e) => { 
-        currentDrawColor = e.target.value; 
-        if (currentTool === 'eraser') {
-            currentTool = 'pen';
-            document.getElementById('toggle-tool-btn').innerHTML = 'Ластик';
-        }
+function setupEvents() {
+    // Інструменти
+    document.getElementById('tool-pen').onclick = () => setTool('pen');
+    document.getElementById('tool-eraser').onclick = () => setTool('eraser');
+
+    // Кольори
+    document.querySelectorAll('.color-btn').forEach(btn => {
+        btn.onclick = () => {
+            document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentColor = btn.dataset.color;
+            if (currentTool === 'eraser') setTool('pen');
+        };
     });
+
+    // Кнопки
+    document.getElementById('clear-btn').onclick = () => {
+        if (confirm('Очистити полотно?')) {
+            pixelGrid = Array(GRID).fill().map(() => Array(GRID).fill(null));
+            redraw();
+            saveArt();
+        }
+    };
+
+    document.getElementById('save-btn').onclick = () => {
+        saveArt();
+        alert('Арт збережено локально!');
+    };
+
+    document.getElementById('send-btn').onclick = () => {
+        saveArt();
+        const artData = localStorage.getItem('morstrix_pixel_art');
+        if (!artData || isEmptyArt()) {
+            alert('Намалюй щось!');
+            return;
+        }
+        const data = `PIXELART|${artData}`;
+        if (WebApp) {
+            WebApp.sendData(data);
+            WebApp.close();
+        } else {
+            alert('Відправлено (тест): ' + data.substring(0, 50) + '...');
+        }
+    };
+
+    // Малювання
+    canvas.addEventListener('pointerdown', startDrawing);
+    canvas.addEventListener('pointermove', draw);
+    canvas.addEventListener('pointerup', stopDrawing);
+    canvas.addEventListener('pointerleave', stopDrawing);
 }
 
-function initPixelGrid() {
-    pixelGrid = Array(GRID_DIMENSION).fill().map(() => Array(GRID_DIMENSION).fill(null));
+function setTool(tool) {
+    currentTool = tool;
+    document.querySelectorAll('[id^="tool-"]').forEach(b => b.classList.remove('active'));
+    document.getElementById('tool-' + tool).classList.add('active');
 }
 
-function redrawCanvas() {
-    ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    ctx.imageSmoothingEnabled = false;
+function startDrawing(e) {
+    e.preventDefault();
+    isDrawing = true;
+    draw(e);
+}
 
-    for (let y = 0; y < GRID_DIMENSION; y++) {
-        for (let x = 0; x < GRID_DIMENSION; x++) {
+function draw(e) {
+    if (!isDrawing) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) / CELL);
+    const y = Math.floor((e.clientY - rect.top) / CELL);
+    if (x >= 0 && x < GRID && y >= 0 && y < GRID) {
+        const color = currentTool === 'pen' ? currentColor : null;
+        if (pixelGrid[y][x] !== color) {
+            pixelGrid[y][x] = color;
+            drawPixel(x, y, color);
+            saveArt(); // автозбереження
+        }
+    }
+}
+
+function stopDrawing() {
+    isDrawing = false;
+}
+
+function drawPixel(x, y, color) {
+    ctx.fillStyle = color || '#222222';
+    ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
+    ctx.strokeStyle = '#2d2d2d';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x * CELL, y * CELL, CELL, CELL);
+}
+
+function drawGrid() {
+    ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    for (let y = 0; y < GRID; y++) {
+        for (let x = 0; x < GRID; x++) {
             const color = pixelGrid[y][x];
             if (color) {
-                ctx.fillStyle = color;
-                ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+                drawPixel(x, y, color);
+            } else {
+                ctx.fillStyle = '#222222';
+                ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
+                ctx.strokeStyle = '#2d2d2d';
+                ctx.strokeRect(x * CELL, y * CELL, CELL, CELL);
             }
         }
     }
-
-    ctx.strokeStyle = '#2d2d2d';
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= GRID_DIMENSION; i++) {
-        ctx.beginPath();
-        ctx.moveTo(i * CELL_SIZE, 0);
-        ctx.lineTo(i * CELL_SIZE, CANVAS_HEIGHT);
-        ctx.moveTo(0, i * CELL_SIZE);
-        ctx.lineTo(CANVAS_WIDTH, i * CELL_SIZE);
-        ctx.stroke();
-    }
 }
 
-function drawSinglePixel(x, y) {
-    if (x < 0 || x >= GRID_DIMENSION || y < 0 || y >= GRID_DIMENSION) return;
-    
-    const color = currentTool === 'pen' ? currentDrawColor : null;
-    const changed = pixelGrid[y][x] !== color;
-    pixelGrid[y][x] = color;
-
-    if (changed) {
-        ctx.fillStyle = color || '#222222';
-        ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-        ctx.strokeStyle = '#2d2d2d';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-    }
+function redraw() {
+    drawGrid();
 }
 
-function getMousePos(event) {
-    const rect = canvas.getBoundingClientRect();
-    const clientX = event.touches ? event.touches[0].clientX : event.clientX;
-    const clientY = event.touches ? event.touches[0].clientY : event.clientY;
-    const x = Math.floor((clientX - rect.left) / CELL_SIZE);
-    const y = Math.floor((clientY - rect.top) / CELL_SIZE);
-    return { x, y };
+function isEmptyArt() {
+    return pixelGrid.every(row => row.every(cell => cell === null));
 }
 
-function handlePointerStart(event) {
-    event.preventDefault();
-    isDrawing = true;
-    const pos = getMousePos(event);
-    drawSinglePixel(pos.x, pos.y);
+// === ЗБЕРЕЖЕННЯ ===
+function saveArt() {
+    localStorage.setItem('morstrix_pixel_art', JSON.stringify(pixelGrid));
 }
 
-function handlePointerMove(event) {
-    if (!isDrawing) return;
-    event.preventDefault();
-    const pos = getMousePos(event);
-    drawSinglePixel(pos.x, pos.y);
-}
-
-function handlePointerEnd() {
-    if (!isDrawing) return;
-    isDrawing = false;
-    saveArt(currentItemId);
-}
-
-function toggleTool() {
-    currentTool = currentTool === 'pen' ? 'eraser' : 'pen';
-    document.getElementById('toggle-tool-btn').innerHTML = currentTool === 'pen' ? 'Ластик' : 'Кисть';
-}
-
-function saveArt(key) {
-    if (key) {
-        localStorage.setItem(`morstrix_art_${key}`, JSON.stringify(pixelGrid));
-    }
-}
-
-function loadArt(key) {
-    if (!key) return initPixelGrid();
-    const saved = localStorage.getItem(`morstrix_art_${key}`);
+function loadArt() {
+    const saved = localStorage.getItem('morstrix_pixel_art');
     if (saved) {
         try {
             pixelGrid = JSON.parse(saved);
         } catch (e) {
-            console.error("Помилка парсингу арту:", e);
-            initPixelGrid();
-        }
-    } else {
-        initPixelGrid();
-    }
-    redrawCanvas();
-}
-
-// === ЗБЕРЕЖЕННЯ ===
-function saveDataStore() {
-    localStorage.setItem('morstrix_drafts', JSON.stringify(dataStore));
-}
-
-function loadDataStore() {
-    const saved = localStorage.getItem('morstrix_drafts');
-    if (saved) {
-        try {
-            dataStore = JSON.parse(saved);
-        } catch (e) {
-            console.error("Помилка парсингу dataStore:", e);
-            dataStore = { catalogs: {} };
+            console.error("Помилка завантаження арту:", e);
+            pixelGrid = Array(GRID).fill().map(() => Array(GRID).fill(null));
         }
     }
+    redraw();
 }
 
-// === ІНІЦІАЛІЗАЦІЯ ===
-function initApp() {
-    loadDataStore();
-    showCatalogList();
-}
-
-window.addEventListener('load', initApp);
+// === СТАРТ ===
+window.addEventListener('load', init);
+window.addEventListener('resize', () => setTimeout(init, 100));

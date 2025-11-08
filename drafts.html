@@ -3,169 +3,113 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MORSTRIX | DRAFTZ</title>
+    <title>MORSTRIX | PIXEL PAINT</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="drafts.js" defer></script>
     <style>
         :root {
-            --bg-color: #000000;
-            --main-green: #00ff00;
-            --dark-green: #008000;
-            --canvas-bg: #222222;
-            --input-bg: #0d0d0d;
+            --bg: #000;
+            --grid: #222;
+            --border: #0f0;
+            --text: #0f0;
         }
-
+        * { margin:0; padding:0; box-sizing:border-box; }
         body {
-            font-family: monospace;
-            background-color: var(--bg-color);
-            color: var(--main-green);
-            margin: 0;
-            padding: 10px;
-            overflow-x: hidden;
-            touch-action: pan-y;
-            image-rendering: pixelated;
-        }
-
-        .action-button, .item-button {
-            display: block;
-            width: 100%;
-            background-color: var(--dark-green);
-            color: var(--bg-color);
-            border: 2px solid var(--main-green);
-            padding: 15px 10px;
-            margin-bottom: 10px;
-            cursor: pointer;
-            text-transform: uppercase;
-            font-size: 14px;
-            text-align: left;
-            box-shadow: 0 0 5px var(--dark-green);
-            transition: background-color 0.1s;
-        }
-        .action-button:hover, .item-button:hover {
-            background-color: var(--main-green);
-            color: var(--bg-color);
-        }
-        .item-button span {
-            float: right;
-            color: var(--main-green);
-        }
-        .item-button:hover span {
-            color: var(--bg-color);
-        }
-
-        .view {
-            display: none;
-            padding-top: 25px;
-            padding-bottom: 50px;
-        }
-        .view.active {
-            display: block;
-        }
-
-        input[type="text"], input[type="datetime-local"], textarea {
-            width: 95%;
-            padding: 10px;
-            background-color: var(--input-bg);
-            border: 1px solid var(--dark-green);
-            color: var(--main-green);
-            font-size: 16px;
-            margin-bottom: 10px;
-            resize: none;
-        }
-
-        #art-canvas-container {
-            width: 100%;
-            max-width: 450px;
-            margin: 0 auto 10px;
-            background-color: var(--canvas-bg);
-            border: 2px solid var(--main-green);
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Courier New', monospace;
             overflow: hidden;
             touch-action: none;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        #canvas-container {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            border: 3px solid var(--border);
+            background: var(--grid);
+            box-shadow: 0 0 15px #0f0;
         }
         #pixel-canvas {
             display: block;
-            touch-action: none;
-            cursor: crosshair;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
         }
-        .art-controls {
+        .toolbar {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            background: rgba(0,0,0,0.9);
+            padding: 10px;
             display: flex;
-            justify-content: space-around;
+            justify-content: center;
             flex-wrap: wrap;
-            margin-bottom: 10px;
+            gap: 8px;
+            border-top: 2px solid var(--border);
         }
-        .art-controls button {
-            background-color: #333;
-            color: var(--main-green);
-            border: 1px solid var(--main-green);
-            padding: 8px 12px;
-            margin: 5px;
-            font-size: 12px;
-        }
-        #color-picker {
-            border: 1px solid var(--main-green);
-            padding: 0;
-            height: 30px;
-            width: 30px;
+        .tool-btn, .color-btn {
+            width: 40px; height: 40px;
+            border: 2px solid var(--border);
+            background: #111;
             cursor: pointer;
+            font-size: 12px;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .color-btn {
+            padding: 0;
+        }
+        .color-btn.active {
+            box-shadow: 0 0 10px #0f0;
+            transform: scale(1.1);
+        }
+        .tool-btn:active, .color-btn:active {
+            transform: scale(0.95);
+        }
+        #save-btn, #clear-btn, #send-btn {
+            background: #008000;
+            color: #000;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
 
-    <div id="catalog-list-view" class="view active">
-        <div id="catalogs-container"></div>
-        <button class="action-button" onclick="showCatalogCreator()">+ СТВОРИТИ КАТАЛОГ</button>
-    </div>
+<div id="canvas-container">
+    <canvas id="pixel-canvas"></canvas>
+</div>
 
-    <div id="item-list-view" class="view">
-        <div id="items-container"></div>
-        <button class="action-button" onclick="showItemCreator()">+ СТВОРИТИ ЕЛЕМЕНТ</button>
-    </div>
+<div class="toolbar">
+    <button id="tool-pen" class="tool-btn active" title="Кисть">✎</button>
+    <button id="tool-eraser" class="tool-btn" title="Ластик">✖</button>
     
-    <div id="catalog-editor-view" class="view">
-        <input type="text" id="catalog-name-input" placeholder="Назва Каталогу">
-        <button class="action-button" onclick="saveCatalog()">ЗБЕРЕГТИ КАТАЛОГ</button>
-        <button class="action-button" onclick="showCatalogList()">СКАСУВАТИ</button>
-    </div>
+    <div style="width:1px; background:var(--border); margin:0 5px;"></div>
 
-    <div id="item-creator-view" class="view">
-        <button class="action-button" onclick="showNoteEditor()">НОВА ЗАМІТКА</button>
-        <button class="action-button" onclick="showPushEditor()">НОВЕ НАГАДУВАННЯ</button>
-        <button class="action-button" onclick="showArtEditor()">НОВИЙ АРТ</button>
-        <button class="action-button" onclick="showItemList()">НАЗАД</button>
-    </div>
+    <button class="color-btn active" style="background:#ffffff" data-color="#ffffff"></button>
+    <button class="color-btn" style="background:#000000" data-color="#000000"></button>
+    <button class="color-btn" style="background:#ff0000" data-color="#ff0000"></button>
+    <button class="color-btn" style="background:#00ff00" data-color="#00ff00"></button>
+    <button class="color-btn" style="background:#0000ff" data-color="#0000ff"></button>
+    <button class="color-btn" style="background:#ffff00" data-color="#ffff00"></button>
+    <button class="color-btn" style="background:#ff00ff" data-color="#ff00ff"></button>
+    <button class="color-btn" style="background:#00ffff" data-color="#00ffff"></button>
+    <button class="color-btn" style="background:#ff8800" data-color="#ff8800"></button>
+    <button class="color-btn" style="background:#88ff00" data-color="#88ff00"></button>
+    <button class="color-btn" style="background:#0088ff" data-color="#0088ff"></button>
+    <button class="color-btn" style="background:#ff0088" data-color="#ff0088"></button>
+    <button class="color-btn" style="background:#8800ff" data-color="#8800ff"></button>
+    <button class="color-btn" style="background:#00ff88" data-color="#00ff88"></button>
+    <button class="color-btn" style="background:#888888" data-color="#888888"></button>
+    <button class="color-btn" style="background:#444444" data-color="#444444"></button>
 
-    <div id="note-editor-view" class="view">
-        <input type="text" id="note-name-input" placeholder="Назва Замітки">
-        <textarea id="note-text-input" rows="10" placeholder="Текст замітки..."></textarea>
-        <button class="action-button" onclick="saveNote()">ЗБЕРЕГТИ</button>
-        <button class="action-button" onclick="showItemList()">НАЗАД</button>
-    </div>
+    <div style="width:1px; background:var(--border); margin:0 5px;"></div>
 
-    <div id="push-editor-view" class="view">
-        <input type="text" id="push-name-input" placeholder="Назва Нагадування">
-        <p>Дата і Час (Ваш локальний час):</p>
-        <input type="datetime-local" id="push-datetime-input">
-        <textarea id="push-text-input" rows="4" placeholder="Текст нагадування..."></textarea>
-        <button class="action-button" onclick="savePush()">ЗАПЛАНУВАТИ</button>
-        <button class="action-button" onclick="showItemList()">НАЗАД</button>
-    </div>
-
-    <div id="art-editor-view" class="view">
-        <input type="text" id="art-name-input" placeholder="Назва Арту">
-        
-        <div id="art-canvas-container">
-            <canvas id="pixel-canvas"></canvas>
-        </div>
-
-        <div class="art-controls">
-            <input type="color" id="color-picker" value="#ffffff" title="Колір">
-            <button id="toggle-tool-btn" onclick="toggleTool()">Кисть</button>
-            <button id="clear-art-btn" onclick="if(confirm('Очистити?')) { initPixelGrid(); redrawCanvas(); saveArt(currentItemId); }">Очистити</button>
-            <button id="send-art-btn" onclick="sendArt()">Відправити</button>
-            <button class="action-button" onclick="showItemList()">НАЗАД</button>
-        </div>
-    </div>
+    <button id="clear-btn" class="tool-btn">ОЧИСТИТИ</button>
+    <button id="save-btn" class="tool-btn">ЗБЕРЕГТИ</button>
+    <button id="send-btn" class="tool-btn">ВІДПРАВИТИ</button>
+</div>
 
 </body>
 </html>
