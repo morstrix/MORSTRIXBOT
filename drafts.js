@@ -13,8 +13,7 @@ let canvas, ctx;
 let isDrawing = false;
 let currentColor = '#ffffff';
 let currentTool = 'pen';
-let lastX = 0, lastY = 0;
-let points = [];
+let path = [];
 
 // === ІНІЦІАЛІЗАЦІЯ ===
 function init() {
@@ -69,7 +68,6 @@ function setupEvents() {
         const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         resizeCanvas();
         ctx.putImageData(imgData, 0, 0);
-        redrawFromPoints(); // відновлення ліній
     });
 }
 
@@ -81,64 +79,40 @@ function setTool(tool) {
 
 function startDrawing(e) {
     isDrawing = true;
-    points = [];
+    path = [];
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    points.push({ x, y });
-    lastX = x; lastY = y;
+    path.push({ x, y });
 }
 
 function draw(e) {
-    if (!isDrawing) return;
+    if (!isDrawing || path.length === 0) return;
     e.preventDefault();
 
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    points.push({ x, y });
+    path.push({ x, y });
 
-    // Малюємо плавно
+    const size = currentTool === 'eraser' ? ERASER_SIZE : BRUSH_SIZE;
+
     ctx.globalCompositeOperation = currentTool === 'eraser' ? 'destination-out' : 'source-over';
-    ctx.lineWidth = currentTool === 'eraser' ? ERASER_SIZE : BRUSH_SIZE;
+    ctx.lineWidth = size;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.strokeStyle = currentTool === 'pen' ? currentColor : '#222';
 
-    if (points.length >= 3) {
-        const mid = {
-            x: (points[points.length-2].x + points[points.length-1].x) / 2,
-            y: (points[points.length-2].y + points[points.length-1].y) / 2
-        };
-        ctx.beginPath();
-        ctx.moveTo(points[points.length-3].x, points[points.length-3].y);
-        ctx.quadraticCurveTo(points[points.length-2].x, points[points.length-2].y, mid.x, mid.y);
-        ctx.stroke();
-    }
+    ctx.beginPath();
+    ctx.moveTo(path[path.length - 2].x, path[path.length - 2].y);
+    ctx.lineTo(path[path.length - 1].x, path[path.length - 1].y);
+    ctx.stroke();
 
-    lastX = x; lastY = y;
     saveArt();
 }
 
 function stopDrawing() {
-    if (!isDrawing) return;
     isDrawing = false;
-
-    // Дорисовуємо останню частину
-    if (points.length > 1) {
-        ctx.beginPath();
-        ctx.moveTo(points[points.length-2].x, points[points.length-2].y);
-        ctx.lineTo(points[points.length-1].x, points[points.length-1].y);
-        ctx.stroke();
-    }
-}
-
-// === ВІДНОВЛЕННЯ ЛІНІЙ ПРИ RESIZE ===
-function redrawFromPoints() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#222';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    // (тут можна зберегти points, але для простоти — лише localStorage)
 }
 
 // === ЗБЕРЕЖЕННЯ ===
@@ -152,6 +126,9 @@ function loadArt() {
     if (saved) {
         const img = new Image();
         img.onload = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#222';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         };
         img.src = saved;
@@ -162,39 +139,40 @@ function loadArt() {
 async function saveToGallery() {
     saveArt();
 
-    const dataUrl = canvas.toDataURL('image/png');
-    const blob = await (await fetch(dataUrl)).blob();
+    canvas.toBlob(async (blob) => {
+        const file = new File([blob], `morstrix_${Date.now()}.png`, { type: 'image/png' });
 
-    // 1. Android Chrome — File System Access
-    if ('showSaveFilePicker' in window) {
-        try {
-            const handle = await window.showSaveFilePicker({
-                suggestedName: `morstrix_${Date.now()}.png`,
-                types: [{ description: 'PNG', accept: { 'image/png': ['.png'] } }]
-            });
-            const writable = await handle.createWritable();
-            await writable.write(blob);
-            await writable.close();
-            alert('Збережено в галерею!');
-            return;
-        } catch (e) { console.warn(e); }
-    }
+        // 1. Web Share API (Android/iOS) — ЗБЕРЕГТИ В ГАЛЕРЕЮ
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+                await navigator.share({
+                    files: [file],
+                    title: 'Малюнок з MORSTRIX',
+                    text: 'Збережено з Paint'
+                });
+                alert('Збережено в галерею!');
+                return;
+            } catch (e) { console.warn('Share API не спрацював', e); }
+        }
 
-    // 2. iOS / резерв — копіювання в буфер
-    if (navigator.clipboard && navigator.clipboard.write) {
-        try {
-            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-            alert('Зображення в буфері обміну!\nУтримуй на фото → "Зберегти в галерею"');
-            return;
-        } catch (e) { console.warn(e); }
-    }
+        // 2. Копіювання в буфер (iOS)
+        if (navigator.clipboard && navigator.clipboard.write) {
+            try {
+                await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                alert('В буфері обміну!\nУтримуй → "Зберегти в Фото"');
+                return;
+            } catch (e) { console.warn(e); }
+        }
 
-    // 3. Резервний download
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = `morstrix_${Date.now()}.png`;
-    a.click();
-    alert('Завантажено! Перевір "Завантаження"');
+        // 3. Резервний download
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        a.click();
+        URL.revokeObjectURL(url);
+        alert('Завантажено!');
+    }, 'image/png');
 }
 
 // === СТАРТ ===
