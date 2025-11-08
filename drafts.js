@@ -1,21 +1,21 @@
 const WebApp = window.Telegram.WebApp;
 
-// === КОНФИГ ===
-const BRUSH_SIZE = 14;
-const ERASER_SIZE = 40;
+// === КОНФІГ ===
+const BRUSH_SIZE = 6;   // маленька кисть
+const ERASER_SIZE = 20;
 const COLORS = [
     '#ffffff','#000000','#ff0000','#00ff00','#0000ff','#ffff00','#ff00ff','#00ffff',
     '#ff8800','#88ff00','#0088ff','#ff0088','#8800ff','#00ff88','#888888','#444444'
 ];
 
-// === СОСТОЯНИЕ ===
+// === СТАН ===
 let canvas, ctx;
 let isDrawing = false;
 let currentColor = '#ffffff';
 let currentTool = 'pen';
 let lastX = 0, lastY = 0;
 
-// === ИНИЦИАЛИЗАЦИЯ ===
+// === ІНІЦІАЛІЗАЦІЯ ===
 function init() {
     canvas = document.getElementById('paint-canvas');
     ctx = canvas.getContext('2d');
@@ -30,10 +30,10 @@ function init() {
 }
 
 function resizeCanvas() {
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     canvas.width = canvas.offsetWidth;
     canvas.height = canvas.offsetHeight;
-    ctx.putImageData(imageData, 0, 0);
+    ctx.putImageData(imgData, 0, 0);
 }
 
 function buildPalette() {
@@ -52,15 +52,13 @@ function buildPalette() {
 }
 
 function setupEvents() {
-    // Инструменты
     document.getElementById('tool-pen').onclick = () => setTool('pen');
     document.getElementById('tool-eraser').onclick = () => setTool('eraser');
     document.getElementById('palette-btn').onclick = () => {
         document.getElementById('palette-grid').classList.toggle('show');
     };
-    document.getElementById('save-btn').onclick = saveToGallery;
+    document.getElementById('send-btn').onclick = sendToBot;
 
-    // Малювання
     canvas.addEventListener('pointerdown', startDrawing);
     canvas.addEventListener('pointermove', draw);
     canvas.addEventListener('pointerup', stopDrawing);
@@ -109,21 +107,21 @@ function draw(e) {
     lastX = x;
     lastY = y;
 
-    saveArt();
+    saveArt(); // автозбереження
 }
 
 function stopDrawing() {
     isDrawing = false;
 }
 
-// === СОХРАНЕНИЕ ===
+// === ЗБЕРЕЖЕННЯ ===
 function saveArt() {
     const dataUrl = canvas.toDataURL('image/png');
-    localStorage.setItem('morstrix_paint', dataUrl);
+    localStorage.setItem('morstrix_draw', dataUrl);
 }
 
 function loadArt() {
-    const saved = localStorage.getItem('morstrix_paint');
+    const saved = localStorage.getItem('morstrix_draw');
     if (saved) {
         const img = new Image();
         img.onload = () => {
@@ -136,40 +134,18 @@ function loadArt() {
     }
 }
 
-// === СОХРАНЕНИЕ В ГАЛЕРЕЮ ===
-async function saveToGallery() {
+// === ВІДПРАВКА У БОТ ===
+function sendToBot() {
     saveArt();
-
-    canvas.toBlob(async (blob) => {
-        const file = new File([blob], `morstrix_${Date.now()}.png`, { type: 'image/png' });
-
-        // 1. Android/iOS — share
-        if (navigator.share && navigator.canShare?.({ files: [file] })) {
-            try {
-                await navigator.share({ files: [file], title: 'Paint' });
-                alert('Збережено в галерею!');
-                return;
-            } catch (e) {}
-        }
-
-        // 2. Копіювання в буфер
-        if (navigator.clipboard?.write) {
-            try {
-                await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-                alert('В буфері! Утримуй → Зберегти');
-                return;
-            } catch (e) {}
-        }
-
-        // 3. Download
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = file.name;
-        a.click();
-        URL.revokeObjectURL(url);
-        alert('Завантажено!');
-    }, 'image/png');
+    const dataUrl = canvas.toDataURL('image/png');
+    const payload = dataUrl.split(',')[1]; // base64
+    const data = `PAINT|${payload}`;
+    if (WebApp) {
+        WebApp.sendData(data);
+        WebApp.close();
+    } else {
+        alert('Відправлено: ' + data.substring(0, 50) + '...');
+    }
 }
 
 // === СТАРТ ===
