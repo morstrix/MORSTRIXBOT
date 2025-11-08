@@ -3,6 +3,7 @@ const WebApp = window.Telegram.WebApp;
 // === КОНФІГ ===
 const BRUSH_SIZE = 12;
 const ERASER_SIZE = 30;
+const INTERPOLATION_STEP = 4; // крок інтерполяції (чим менше — плавніше)
 const COLORS = [
     '#ffffff','#000000','#ff0000','#00ff00','#0000ff','#ffff00','#ff00ff','#00ffff',
     '#ff8800','#88ff00','#0088ff','#ff0088','#8800ff','#00ff88','#888888','#444444'
@@ -10,21 +11,15 @@ const COLORS = [
 
 // === СТАН ===
 let canvas, ctx;
-let bufferCanvas, bufferCtx;
 let isDrawing = false;
 let currentColor = '#ffffff';
 let currentTool = 'pen';
-let path = [];
+let lastX = 0, lastY = 0;
 
 // === ІНІЦІАЛІЗАЦІЯ ===
 function init() {
     canvas = document.getElementById('paint-canvas');
     ctx = canvas.getContext('2d');
-    
-    // Буферний canvas
-    bufferCanvas = document.createElement('canvas');
-    bufferCtx = bufferCanvas.getContext('2d');
-
     resizeCanvas();
 
     ctx.fillStyle = '#222';
@@ -39,8 +34,6 @@ function resizeCanvas() {
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     canvas.width = canvas.offsetWidth;
     canvas.height = canvas.offsetHeight;
-    bufferCanvas.width = canvas.width;
-    bufferCanvas.height = canvas.height;
     ctx.putImageData(imageData, 0, 0);
 }
 
@@ -68,9 +61,9 @@ function setupEvents() {
     document.getElementById('save-btn').onclick = saveToGallery;
 
     canvas.addEventListener('pointerdown', startDrawing);
-    canvas.addEventListener('pointermove', drawPreview);
-    canvas.addEventListener('pointerup', commitPath);
-    canvas.addEventListener('pointerleave', commitPath);
+    canvas.addEventListener('pointermove', drawWithInterpolation);
+    canvas.addEventListener('pointerup', stopDrawing);
+    canvas.addEventListener('pointerleave', stopDrawing);
 
     window.addEventListener('resize', () => {
         const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -87,74 +80,57 @@ function setTool(tool) {
 
 function startDrawing(e) {
     isDrawing = true;
-    path = [];
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    path.push({ x, y });
-    bufferCtx.clearRect(0, 0, bufferCanvas.width, bufferCanvas.height);
+    lastX = e.clientX - rect.left;
+    lastY = e.clientY - rect.top;
 }
 
-function drawPreview(e) {
+function drawWithInterpolation(e) {
     if (!isDrawing) return;
     e.preventDefault();
 
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    path.push({ x, y });
 
-    // Прев’ю в буфері
-    bufferCtx.clearRect(0, 0, bufferCanvas.width, bufferCanvas.height);
-    drawPath(bufferCtx, path, true);
+    // === ІНТЕРПОЛЯЦІЯ ===
+    const dx = x - lastX;
+    const dy = y - lastY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const steps = Math.max(1, Math.floor(distance / INTERPOLATION_STEP));
 
-    // Показуємо буфер на основному canvas
-    ctx.drawImage(bufferCanvas, 0, 0);
-}
-
-function commitPath() {
-    if (!isDrawing || path.length < 2) {
-        isDrawing = false;
-        return;
+    for (let i = 1; i <= steps; i++) {
+        const interpX = lastX + (dx * i) / steps;
+        const interpY = lastY + (dy * i) / steps;
+        drawLineSegment(lastX, lastY, interpX, interpY);
+        lastX = interpX;
+        lastY = interpY;
     }
 
-    // Рендеримо остаточно на основний canvas
-    drawPath(ctx, path, false);
-    bufferCtx.clearRect(0, 0, bufferCanvas.width, bufferCanvas.height);
+    // Остання точка
+    drawLineSegment(lastX, lastY, x, y);
+    lastX = x;
+    lastY = y;
+
     saveArt();
-    isDrawing = false;
 }
 
-function drawPath(context, points, isPreview) {
-    if (points.length < 2) return;
-
+function drawLineSegment(x1, y1, x2, y2) {
     const size = currentTool === 'eraser' ? ERASER_SIZE : BRUSH_SIZE;
-    context.globalCompositeOperation = currentTool === 'eraser' ? 'destination-out' : 'source-over';
-    context.lineWidth = size;
-    context.lineCap = 'round';
-    context.lineJoin = 'round';
-    context.strokeStyle = currentTool === 'pen' ? currentColor : '#222';
 
-    context.beginPath();
-    context.moveTo(points[0].x, points[0].y);
+    ctx.globalCompositeOperation = currentTool === 'eraser' ? 'destination-out' : 'source-over';
+    ctx.lineWidth = size;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = currentTool === 'pen' ? currentColor : '#222';
 
-    for (let i = 1; i < points.length - 2; i++) {
-        const xc = (points[i].x + points[i + 1].x) / 2;
-        const yc = (points[i].y + points[i + 1].y) / 2;
-        context.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
-    }
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+}
 
-    // Останній сегмент
-    if (points.length > 1) {
-        context.quadraticCurveTo(
-            points[points.length - 2].x,
-            points[points.length - 2].y,
-            points[points.length - 1].x,
-            points[points.length - 1].y
-        );
-    }
-
-    context.stroke();
+function stopDrawing() {
+    isDrawing = false;
 }
 
 // === ЗБЕРЕЖЕННЯ ===
@@ -184,16 +160,14 @@ async function saveToGallery() {
     canvas.toBlob(async (blob) => {
         const file = new File([blob], `morstrix_${Date.now()}.png`, { type: 'image/png' });
 
-        // 1. Web Share API — Android/iOS
-        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        if (navigator.share && navigator.canShare?.({ files: [file] })) {
             try {
-                await navigator.share({ files: [file], title: 'MORSTRIX Paint' });
-                alert('Збережено!');
+                await navigator.share({ files: [file] });
+                alert('Збережено в галерею!');
                 return;
             } catch (e) {}
         }
 
-        // 2. Копіювання в буфер
         if (navigator.clipboard?.write) {
             try {
                 await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
@@ -202,7 +176,6 @@ async function saveToGallery() {
             } catch (e) {}
         }
 
-        // 3. Download
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
