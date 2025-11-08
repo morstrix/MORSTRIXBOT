@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MORSTRIX | PIXEL PAINT</title>
+    <title>MORSTRIX | PAINT</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="drafts.js" defer></script>
     <style>
         :root {
             --bg: #000;
-            --grid: #222;
             --border: #0f0;
             --text: #0f0;
         }
@@ -20,21 +19,18 @@
             font-family: 'Courier New', monospace;
             overflow: hidden;
             touch-action: none;
-            image-rendering: pixelated;
-            image-rendering: crisp-edges;
         }
         #canvas-container {
             position: fixed;
             top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             border: 3px solid var(--border);
-            background: var(--grid);
+            background: #111;
             box-shadow: 0 0 15px #0f0;
         }
-        #pixel-canvas {
+        #paint-canvas {
             display: block;
-            image-rendering: pixelated;
-            image-rendering: crisp-edges;
+            background: #222;
         }
         .toolbar {
             position: fixed;
@@ -78,12 +74,12 @@
 <body>
 
 <div id="canvas-container">
-    <canvas id="pixel-canvas"></canvas>
+    <canvas id="paint-canvas"></canvas>
 </div>
 
 <div class="toolbar">
-    <button id="tool-pen" class="tool-btn active" title="Кисть">✎</button>
-    <button id="tool-eraser" class="tool-btn" title="Ластик">✖</button>
+    <button id="tool-pen" class="tool-btn active" title="Кисть">BRUSH</button>
+    <button id="tool-eraser" class="tool-btn" title="Ластик">ERASER</button>
     
     <div style="width:1px; background:var(--border); margin:0 5px;"></div>
 

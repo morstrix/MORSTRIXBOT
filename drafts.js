@@ -1,36 +1,34 @@
 const WebApp = window.Telegram.WebApp;
 
 // === КОНФІГ ===
-const GRID = 16;
-const CELL = 20; // розмір пікселя в UI
-const CANVAS_SIZE = GRID * CELL;
+const CANVAS_SIZE = 600; // фіксований розмір полотна
+const BRUSH_SIZE = 8;
 
 // === СТАН ===
 let canvas, ctx;
-let pixelGrid = Array(GRID).fill().map(() => Array(GRID).fill(null));
 let isDrawing = false;
 let currentColor = '#ffffff';
 let currentTool = 'pen'; // 'pen' | 'eraser'
 
 // === ІНІЦІАЛІЗАЦІЯ ===
 function init() {
-    canvas = document.getElementById('pixel-canvas');
+    canvas = document.getElementById('paint-canvas');
     ctx = canvas.getContext('2d');
     canvas.width = CANVAS_SIZE;
     canvas.height = CANVAS_SIZE;
 
     // Масштабування під екран
     const container = document.getElementById('canvas-container');
-    const scale = Math.min(
-        (window.innerWidth * 0.9) / CANVAS_SIZE,
-        (window.innerHeight * 0.7) / CANVAS_SIZE
-    );
+    const maxDim = Math.min(window.innerWidth, window.innerHeight) * 0.8;
+    const scale = maxDim / CANVAS_SIZE;
     const scaledSize = CANVAS_SIZE * scale;
     container.style.width = scaledSize + 'px';
     container.style.height = scaledSize + 'px';
 
+    ctx.fillStyle = '#222';
+    ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
     loadArt();
-    drawGrid();
     setupEvents();
 }
 
@@ -52,25 +50,22 @@ function setupEvents() {
     // Кнопки
     document.getElementById('clear-btn').onclick = () => {
         if (confirm('Очистити полотно?')) {
-            pixelGrid = Array(GRID).fill().map(() => Array(GRID).fill(null));
-            redraw();
+            ctx.fillStyle = '#222';
+            ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
             saveArt();
         }
     };
 
     document.getElementById('save-btn').onclick = () => {
         saveArt();
-        alert('Арт збережено локально!');
+        alert('Малюнок збережено!');
     };
 
     document.getElementById('send-btn').onclick = () => {
         saveArt();
-        const artData = localStorage.getItem('morstrix_pixel_art');
-        if (!artData || isEmptyArt()) {
-            alert('Намалюй щось!');
-            return;
-        }
-        const data = `PIXELART|${artData}`;
+        const dataUrl = canvas.toDataURL('image/png');
+        const payload = dataUrl.split(',')[1]; // base64
+        const data = `PAINT|${payload}`;
         if (WebApp) {
             WebApp.sendData(data);
             WebApp.close();
@@ -101,71 +96,37 @@ function startDrawing(e) {
 function draw(e) {
     if (!isDrawing) return;
     const rect = canvas.getBoundingClientRect();
-    const x = Math.floor((e.clientX - rect.left) / CELL);
-    const y = Math.floor((e.clientY - rect.top) / CELL);
-    if (x >= 0 && x < GRID && y >= 0 && y < GRID) {
-        const color = currentTool === 'pen' ? currentColor : null;
-        if (pixelGrid[y][x] !== color) {
-            pixelGrid[y][x] = color;
-            drawPixel(x, y, color);
-            saveArt(); // автозбереження
-        }
-    }
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    ctx.globalCompositeOperation = currentTool === 'eraser' ? 'destination-out' : 'source-over';
+    ctx.fillStyle = currentTool === 'pen' ? currentColor : '#222';
+    ctx.beginPath();
+    ctx.arc(x, y, BRUSH_SIZE / 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    saveArt(); // автозбереження
 }
 
 function stopDrawing() {
     isDrawing = false;
 }
 
-function drawPixel(x, y, color) {
-    ctx.fillStyle = color || '#222222';
-    ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
-    ctx.strokeStyle = '#2d2d2d';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(x * CELL, y * CELL, CELL, CELL);
-}
-
-function drawGrid() {
-    ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-    for (let y = 0; y < GRID; y++) {
-        for (let x = 0; x < GRID; x++) {
-            const color = pixelGrid[y][x];
-            if (color) {
-                drawPixel(x, y, color);
-            } else {
-                ctx.fillStyle = '#222222';
-                ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
-                ctx.strokeStyle = '#2d2d2d';
-                ctx.strokeRect(x * CELL, y * CELL, CELL, CELL);
-            }
-        }
-    }
-}
-
-function redraw() {
-    drawGrid();
-}
-
-function isEmptyArt() {
-    return pixelGrid.every(row => row.every(cell => cell === null));
-}
-
 // === ЗБЕРЕЖЕННЯ ===
 function saveArt() {
-    localStorage.setItem('morstrix_pixel_art', JSON.stringify(pixelGrid));
+    const dataUrl = canvas.toDataURL('image/png');
+    localStorage.setItem('morstrix_paint_art', dataUrl);
 }
 
 function loadArt() {
-    const saved = localStorage.getItem('morstrix_pixel_art');
+    const saved = localStorage.getItem('morstrix_paint_art');
     if (saved) {
-        try {
-            pixelGrid = JSON.parse(saved);
-        } catch (e) {
-            console.error("Помилка завантаження арту:", e);
-            pixelGrid = Array(GRID).fill().map(() => Array(GRID).fill(null));
-        }
+        const img = new Image();
+        img.onload = () => {
+            ctx.drawImage(img, 0, 0);
+        };
+        img.src = saved;
     }
-    redraw();
 }
 
 // === СТАРТ ===
