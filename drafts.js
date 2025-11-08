@@ -27,16 +27,39 @@ function showCatalogList() {
 function showCatalogCreator() {
     showView('catalog-editor-view');
     document.getElementById('catalog-name-input').value = '';
+    currentCatalogId = null; // Новий каталог
 }
 
-function createCatalog() {
+function saveCatalog() {
     const name = document.getElementById('catalog-name-input').value.trim();
     if (!name) return alert("Введіть назву каталогу");
-    
-    const id = Date.now().toString();
-    dataStore.catalogs[id] = { name, items: {} };
+
+    if (!currentCatalogId) {
+        // Створення нового
+        currentCatalogId = Date.now().toString();
+        dataStore.catalogs[currentCatalogId] = { name, items: {} };
+    } else {
+        // Редагування
+        dataStore.catalogs[currentCatalogId].name = name;
+    }
+
     saveDataStore();
     showCatalogList();
+}
+
+function editCatalog(id) {
+    currentCatalogId = id;
+    const cat = dataStore.catalogs[id];
+    document.getElementById('catalog-name-input').value = cat.name;
+    showView('catalog-editor-view');
+}
+
+function deleteCatalog(id) {
+    if (confirm("Видалити каталог і всі елементи?")) {
+        delete dataStore.catalogs[id];
+        saveDataStore();
+        renderCatalogs();
+    }
 }
 
 function renderCatalogs() {
@@ -45,9 +68,29 @@ function renderCatalogs() {
     for (const [id, cat] of Object.entries(dataStore.catalogs)) {
         const btn = document.createElement('button');
         btn.className = 'item-button';
-        btn.innerHTML = `${cat.name} <span>${Object.keys(cat.items).length}</span>`;
-        btn.onclick = () => openCatalog(id);
+        btn.innerHTML = `
+            ${cat.name} 
+            <span>${Object.keys(cat.items).length}</span>
+            <small style="float:right; opacity:0.6; margin-left:5px;">✏️</small>
+        `;
+        btn.onclick = (e) => {
+            if (e.target.tagName === 'SMALL') {
+                editCatalog(id);
+            } else {
+                openCatalog(id);
+            }
+        };
         container.appendChild(btn);
+
+        // Кнопка видалення
+        const delBtn = document.createElement('button');
+        delBtn.textContent = '🗑️';
+        delBtn.style.cssText = 'float:right; background:none; border:none; font-size:12px; cursor:pointer;';
+        delBtn.onclick = (e) => {
+            e.stopPropagation();
+            deleteCatalog(id);
+        };
+        btn.appendChild(delBtn);
     }
 }
 
@@ -185,7 +228,9 @@ function sendArt() {
     saveArtItem(); 
     if (!currentItemId) return alert("Спочатку збережіть арт.");
     const artData = localStorage.getItem(`morstrix_art_${currentItemId}`);
-    if (!artData || artData === JSON.stringify(initPixelGrid())) return alert("Арт пустий.");
+    if (!artData || artData === JSON.stringify(Array(GRID_DIMENSION).fill().map(() => Array(GRID_DIMENSION).fill(null))))) {
+        return alert("Арт пустий.");
+    }
     const data = `ART|${currentCatalogId}_${currentItemId}|${artData}`;
     if (WebApp) {
         WebApp.sendData(data);
@@ -206,8 +251,9 @@ function initArtEditor() {
     redrawCanvas();
 
     // Очищаємо попередні обробники
-    canvas.replaceWith(canvas.cloneNode(true));
-    canvas = document.getElementById('pixel-canvas');
+    const newCanvas = canvas.cloneNode(true);
+    canvas.parentNode.replaceChild(newCanvas, canvas);
+    canvas = newCanvas;
     ctx = canvas.getContext('2d');
 
     canvas.addEventListener('mousedown', handlePointerStart);
@@ -234,7 +280,6 @@ function redrawCanvas() {
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     ctx.imageSmoothingEnabled = false;
 
-    // Малюємо пікселі
     for (let y = 0; y < GRID_DIMENSION; y++) {
         for (let x = 0; x < GRID_DIMENSION; x++) {
             const color = pixelGrid[y][x];
@@ -245,7 +290,6 @@ function redrawCanvas() {
         }
     }
 
-    // Сітка
     ctx.strokeStyle = '#2d2d2d';
     ctx.lineWidth = 1;
     for (let i = 0; i <= GRID_DIMENSION; i++) {
@@ -258,7 +302,6 @@ function redrawCanvas() {
     }
 }
 
-// Оптимізоване малювання одного пікселя
 function drawSinglePixel(x, y) {
     if (x < 0 || x >= GRID_DIMENSION || y < 0 || y >= GRID_DIMENSION) return;
     
@@ -267,10 +310,8 @@ function drawSinglePixel(x, y) {
     pixelGrid[y][x] = color;
 
     if (changed) {
-        ctx.fillStyle = color || '#222222'; // фон
+        ctx.fillStyle = color || '#222222';
         ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-        
-        // Перемальовуємо сітку на цьому пікселі
         ctx.strokeStyle = '#2d2d2d';
         ctx.lineWidth = 1;
         ctx.strokeRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
@@ -303,8 +344,7 @@ function handlePointerMove(event) {
 function handlePointerEnd() {
     if (!isDrawing) return;
     isDrawing = false;
-    saveArt(currentItemId); // Зберігаємо лише після завершення
-    console.log("Арт збережено після малювання");
+    saveArt(currentItemId);
 }
 
 function toggleTool() {
@@ -315,7 +355,6 @@ function toggleTool() {
 function saveArt(key) {
     if (key) {
         localStorage.setItem(`morstrix_art_${key}`, JSON.stringify(pixelGrid));
-        console.log(`Арт збережено: morstrix_art_${key}`);
     }
 }
 
