@@ -2,7 +2,7 @@ const WebApp = window.Telegram.WebApp;
 let currentCatalogId = null;
 let currentItemId = null;
 let dataStore = { catalogs: {} };
-let canvas, ctx, colorPicker, toggleToolBtn, clearArtBtn;
+let canvas, ctx, colorPicker;
 let pixelGrid = [];
 let isDrawing = false;
 let currentDrawColor = '#ffffff';
@@ -55,14 +55,6 @@ function openCatalog(id) {
     currentCatalogId = id;
     showView('item-list-view');
     renderItems();
-}
-
-function deleteCatalog(id) {
-    if (confirm("Видалити каталог?")) {
-        delete dataStore.catalogs[id];
-        saveDataStore();
-        showCatalogList();
-    }
 }
 
 // === ЕЛЕМЕНТИ ===
@@ -186,13 +178,14 @@ function saveArtItem() {
     }
     saveArt(currentItemId);
     saveDataStore();
+    alert("Арт збережено!");
 }
 
 function sendArt() {
     saveArtItem(); 
     if (!currentItemId) return alert("Спочатку збережіть арт.");
     const artData = localStorage.getItem(`morstrix_art_${currentItemId}`);
-    if (!artData) return alert("Арт пустий.");
+    if (!artData || artData === JSON.stringify(initPixelGrid())) return alert("Арт пустий.");
     const data = `ART|${currentCatalogId}_${currentItemId}|${artData}`;
     if (WebApp) {
         WebApp.sendData(data);
@@ -210,21 +203,38 @@ function initArtEditor() {
     canvas.height = CANVAS_HEIGHT;
     
     initPixelGrid();
+    redrawCanvas();
+
+    // Очищаємо попередні обробники
+    canvas.replaceWith(canvas.cloneNode(true));
+    canvas = document.getElementById('pixel-canvas');
+    ctx = canvas.getContext('2d');
+
     canvas.addEventListener('mousedown', handlePointerStart);
     canvas.addEventListener('mousemove', handlePointerMove);
     document.addEventListener('mouseup', handlePointerEnd);
-    canvas.addEventListener('touchstart', handlePointerStart);
-    canvas.addEventListener('touchmove', handlePointerMove);
+    canvas.addEventListener('touchstart', handlePointerStart, { passive: false });
+    canvas.addEventListener('touchmove', handlePointerMove, { passive: false });
     canvas.addEventListener('touchend', handlePointerEnd);
-    colorPicker.addEventListener('input', (e) => { currentDrawColor = e.target.value; if (currentTool === 'eraser') toggleTool(); });
+
+    colorPicker.addEventListener('input', (e) => { 
+        currentDrawColor = e.target.value; 
+        if (currentTool === 'eraser') {
+            currentTool = 'pen';
+            document.getElementById('toggle-tool-btn').innerHTML = 'Ластик';
+        }
+    });
 }
 
 function initPixelGrid() {
-    pixelGrid = Array(GRID_DIMENSION).fill(0).map(() => Array(GRID_DIMENSION).fill(null));
+    pixelGrid = Array(GRID_DIMENSION).fill().map(() => Array(GRID_DIMENSION).fill(null));
 }
 
 function redrawCanvas() {
-    ctx.clearRect(0, 0, CANvas_WIDTH, CANVAS_HEIGHT);
+    ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    ctx.imageSmoothingEnabled = false;
+
+    // Малюємо пікселі
     for (let y = 0; y < GRID_DIMENSION; y++) {
         for (let x = 0; x < GRID_DIMENSION; x++) {
             const color = pixelGrid[y][x];
@@ -234,7 +244,9 @@ function redrawCanvas() {
             }
         }
     }
-    ctx.strokeStyle = '#2d2d2d'; 
+
+    // Сітка
+    ctx.strokeStyle = '#2d2d2d';
     ctx.lineWidth = 1;
     for (let i = 0; i <= GRID_DIMENSION; i++) {
         ctx.beginPath();
@@ -246,48 +258,53 @@ function redrawCanvas() {
     }
 }
 
-function getMousePos(event) {
-    const rect = canvas.getBoundingClientRect();
-    let clientX = event.touches ? event.touches[0].clientX : event.clientX;
-    let clientY = event.touches ? event.touches[0].clientY : event.clientY;
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
-    return {
-        x: Math.floor(x / CELL_SIZE),
-        y: Math.floor(y / CELL_SIZE)
-    };
-}
+// Оптимізоване малювання одного пікселя
+function drawSinglePixel(x, y) {
+    if (x < 0 || x >= GRID_DIMENSION || y < 0 || y >= GRID_DIMENSION) return;
+    
+    const color = currentTool === 'pen' ? currentDrawColor : null;
+    const changed = pixelGrid[y][x] !== color;
+    pixelGrid[y][x] = color;
 
-let lastX = -1, lastY = -1;
-function drawPixel(x, y) {
-    if (x >= 0 && x < GRID_DIMENSION && y >= 0 && y < GRID_DIMENSION) {
-        if (x === lastX && y === lastY) return; 
-        const color = currentTool === 'pen' ? currentDrawColor : null;
-        pixelGrid[y][x] = color;
-        redrawCanvas();
-        saveArt(currentItemId); 
-        lastX = x; lastY = y;
+    if (changed) {
+        ctx.fillStyle = color || '#222222'; // фон
+        ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+        
+        // Перемальовуємо сітку на цьому пікселі
+        ctx.strokeStyle = '#2d2d2d';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
     }
 }
 
+function getMousePos(event) {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+    const clientY = event.touches ? event.touches[0].clientY : event.clientY;
+    const x = Math.floor((clientX - rect.left) / CELL_SIZE);
+    const y = Math.floor((clientY - rect.top) / CELL_SIZE);
+    return { x, y };
+}
+
 function handlePointerStart(event) {
-    event.preventDefault(); 
+    event.preventDefault();
     isDrawing = true;
     const pos = getMousePos(event);
-    lastX = -1; lastY = -1; 
-    drawPixel(pos.x, pos.y);
+    drawSinglePixel(pos.x, pos.y);
 }
 
 function handlePointerMove(event) {
     if (!isDrawing) return;
     event.preventDefault();
     const pos = getMousePos(event);
-    drawPixel(pos.x, pos.y);
+    drawSinglePixel(pos.x, pos.y);
 }
 
 function handlePointerEnd() {
+    if (!isDrawing) return;
     isDrawing = false;
-    lastX = -1; lastY = -1; 
+    saveArt(currentItemId); // Зберігаємо лише після завершення
+    console.log("Арт збережено після малювання");
 }
 
 function toggleTool() {
@@ -296,14 +313,25 @@ function toggleTool() {
 }
 
 function saveArt(key) {
-    if (key) localStorage.setItem(`morstrix_art_${key}`, JSON.stringify(pixelGrid));
+    if (key) {
+        localStorage.setItem(`morstrix_art_${key}`, JSON.stringify(pixelGrid));
+        console.log(`Арт збережено: morstrix_art_${key}`);
+    }
 }
 
 function loadArt(key) {
     if (!key) return initPixelGrid();
     const saved = localStorage.getItem(`morstrix_art_${key}`);
-    if (saved) pixelGrid = JSON.parse(saved);
-    else initPixelGrid();
+    if (saved) {
+        try {
+            pixelGrid = JSON.parse(saved);
+        } catch (e) {
+            console.error("Помилка парсингу арту:", e);
+            initPixelGrid();
+        }
+    } else {
+        initPixelGrid();
+    }
     redrawCanvas();
 }
 
@@ -314,7 +342,14 @@ function saveDataStore() {
 
 function loadDataStore() {
     const saved = localStorage.getItem('morstrix_drafts');
-    if (saved) dataStore = JSON.parse(saved);
+    if (saved) {
+        try {
+            dataStore = JSON.parse(saved);
+        } catch (e) {
+            console.error("Помилка парсингу dataStore:", e);
+            dataStore = { catalogs: {} };
+        }
+    }
 }
 
 // === ІНІЦІАЛІЗАЦІЯ ===

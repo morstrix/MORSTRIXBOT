@@ -9,3 +9,8 @@ services:
     startCommand: python main.py
     envVars:
       RENDER: "true"
+      RENDER_EXTERNAL_URL: "https://your-service.onrender.com"  # ← ЗАМІНИ НА СВІЙ URL
+      TELEGRAM_BOT_TOKEN: "YOUR_BOT_TOKEN"
+      # інші змінні...
+    autoDeploy: true
+    healthCheckPath: /health
