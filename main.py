@@ -10,11 +10,11 @@ from telegram.ext import (
 )
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from telegram.constants import ParseMode, UpdateType
+from telegram.constants import ParseMode
 from dotenv import load_dotenv
 from aiohttp import web
 
-# === Імпорт модулів бота ===
+# === Імпорти модулів ===
 from ai import handle_gemini_message_group, handle_gemini_message_private
 from handlers import (
     handle_new_members, handle_join_request, handle_callback_query,
@@ -42,36 +42,22 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 PORT = int(os.environ.get("PORT", 8080))
 
 if not TELEGRAM_BOT_TOKEN:
-    raise ValueError("TELEGRAM_BOT_TOKEN не знайдено! Додай у .env або Render Env Vars.")
+    raise ValueError("TELEGRAM_BOT_TOKEN не знайдено!")
 
 # ========================================
-# КОМАНДИ
+# КОМАНДА /start (без Web App кнопки)
 # ========================================
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "ᴡᴇʟᴄᴏᴍᴇ \n\n"
-        "фунᴋціᴏнᴀʌ:\n"
-        "➞ ᴀʙᴛᴏпᴘийᴏᴍ зᴀяʙᴏᴋ\n"
-        "➞ пᴇᴘᴇʙіᴘᴋᴀ пᴏᴄиʌᴀнь\n"
-        "➞ /font - ᴛᴇᴋᴄᴛ ᴄᴛᴀйʌᴇᴘ \n\n"
-        "➞ ШІ — дʌя чʌᴇніʙ ᴋʌубу.\n"
-        "ᴛᴘигᴇᴘ ᴀʌᴏ у гᴘупі.\n\n"
-        "➞ ʜᴇʟᴘᴇʀ: ɴᴏᴛᴇ/ᴀʀᴛ/ᴘᴜꜱʜ",
-        parse_mode=ParseMode.MARKDOWN
-    )
-
-async def drafts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Відкриває DRAFTZ через GitHub Pages (стабільно, швидко, без Render)."""
-    web_app_url = "https://morstrix.github.io/MORSTRIXBOT/drafts.html"
-    logger.info(f"Відкриваю DRAFTZ: {web_app_url}")
-
-    keyboard = [[InlineKeyboardButton("ВІДКРИТИ DRAFTZ", web_app={"url": web_app_url})]]
+    keyboard = [[InlineKeyboardButton("ПРАВИЛА", callback_data="show_rules")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
-        "**MORSTRIX DRAFTZ**\n"
-        "Каталоги • Замітки • Нагадування • Піксельний арт\n"
-        "Зберігання: LocalStorage (у браузері)",
+        "ᴡᴇʟᴄᴏᴍᴇ \n\n"
+        "➞ ᴀʙᴛᴏпᴘийᴏᴍ зᴀяʙᴏᴋ\n"
+        "➞ пᴇᴘᴇʙіᴘᴋᴀ пᴏᴄиʌᴀнь\n"
+        "➞ /font - ᴛᴇᴋᴄᴛ ᴄᴛᴀйʌᴇᴘ\n\n"
+        "➞ ШІ — дʌя чʌᴇніʙ ᴋʌубу (ᴀʌᴏ)\n"
+        "➞ DRAFTZ — у меню (Main App)",
         reply_markup=reply_markup,
         parse_mode=ParseMode.MARKDOWN
     )
@@ -81,14 +67,11 @@ async def drafts_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ========================================
 def setup_handlers(application: Application):
     application.add_handler(CommandHandler("start", start_command))
-    application.add_handler(CommandHandler("drafts", drafts_command))
 
-    # FONT CONVERSATION
+    # FONT
     font_conv_handler = ConversationHandler(
         entry_points=[CommandHandler("font", font_start)],
-        states={
-            0: [MessageHandler(filters.TEXT & ~filters.COMMAND, font_get_text)],
-        },
+        states={0: [MessageHandler(filters.TEXT & ~filters.COMMAND, font_get_text)]},
         fallbacks=[CommandHandler("cancel", font_cancel)],
         allow_reentry=True
     )
@@ -97,6 +80,8 @@ def setup_handlers(application: Application):
     application.add_handler(CallbackQueryHandler(handle_callback_query))
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members))
     application.add_handler(ChatJoinRequestHandler(handle_join_request))
+
+    # КРИТИЧНО: Прийом даних з Mini App (Main App)
     application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_web_app_data))
 
     # Gemini AI
@@ -111,12 +96,11 @@ def setup_handlers(application: Application):
     application.add_handler(MessageHandler(link_filters & filters.ChatType.GROUPS, check_links))
 
 # ========================================
-# WEBHOOK SERVER (тільки для Telegram)
+# WEBHOOK SERVER
 # ========================================
 async def start_webhook_server(application: Application):
     app = web.Application()
 
-    # Webhook endpoint
     webhook_path = f'/webhook_{TELEGRAM_BOT_TOKEN}'
     async def telegram_webhook(request):
         try:
@@ -130,49 +114,31 @@ async def start_webhook_server(application: Application):
 
     app.router.add_post(webhook_path, telegram_webhook)
 
-    # Health check
     async def health(request):
         return web.Response(text="MORSTRIX BOT IS ALIVE", status=200)
     app.router.add_get('/', health)
     app.router.add_get('/health', health)
 
-    # Додаємо application
     app['bot_app'] = application
 
-    # Ініціалізація
     await application.initialize()
     setup_handlers(application)
 
-    # Встановлюємо вебхук
-    if os.getenv("RENDER") == "true":
-        render_url = f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}"
-        webhook_url = f"{render_url}{webhook_path}"
-    else:
-        webhook_url = f"https://example.com{webhook_path}"  # для локального тесту
-
+    webhook_url = f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}{webhook_path}"
     logger.info(f"Встановлюю вебхук: {webhook_url}")
     try:
-        await application.bot.set_webhook(
-            url=webhook_url,
-            allowed_updates=Update.ALL_TYPES,
-            drop_pending_updates=True
-        )
-        logger.info("Вебхук успішно встановлено!")
+        await application.bot.set_webhook(url=webhook_url, drop_pending_updates=True)
+        logger.info("Вебхук встановлено!")
     except Exception as e:
-        logger.error(f"Не вдалося встановити вебхук: {e}")
+        logger.error(f"Помилка вебхука: {e}")
 
-    # Запуск сервера
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', PORT)
     await site.start()
-    logger.info(f"Webhook сервер запущено на 0.0.0.0:{PORT}")
+    logger.info(f"Сервер запущено: 0.0.0.0:{PORT}")
 
-    # Запуск JobQueue
     await application.start()
-    logger.info("Bot Application запущено.")
-
-    # Тримаємо процес живим
     await asyncio.Future()
 
 # ========================================
@@ -182,12 +148,12 @@ application = Application.builder().token(TELEGRAM_BOT_TOKEN).job_queue(JobQueue
 
 def main():
     if os.getenv("RENDER") == "true":
-        logger.info("=== ЗАПУСК НА RENDER (WEBHOOK) ===")
+        logger.info("=== RENDER: WEBHOOK MODE ===")
         asyncio.run(start_webhook_server(application))
     else:
-        logger.info("=== ЗАПУСК У РЕЖИМІ POLLING ===")
+        logger.info("=== LOCAL: POLLING MODE ===")
         setup_handlers(application)
-        application.run_polling(allowed_updates=Update.ALL_TYPES)
+        application.run_polling()
 
 if __name__ == "__main__":
     try:
