@@ -78,6 +78,12 @@ function setTool(tool) {
 }
 
 function startDrawing(e) {
+    /* ✅ ФІКС: 
+        Додатково запобігаємо стандартній поведінці 
+        (початок скролінгу) при першому дотику.
+    */
+    e.preventDefault();
+
     isDrawing = true;
     const rect = canvas.getBoundingClientRect();
     lastX = e.clientX - rect.left;
@@ -86,7 +92,7 @@ function startDrawing(e) {
 
 function draw(e) {
     if (!isDrawing) return;
-    e.preventDefault();
+    e.preventDefault(); // Залишаємо це також для надійності
 
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
