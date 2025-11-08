@@ -12,6 +12,7 @@ let canvas, ctx;
 let isDrawing = false;
 let currentColor = '#ffffff';
 let currentTool = 'pen'; // 'pen' | 'eraser'
+let lastX = 0, lastY = 0;
 
 // === ІНІЦІАЛІЗАЦІЯ ===
 function init() {
@@ -28,8 +29,10 @@ function init() {
 }
 
 function resizeCanvas() {
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     canvas.width = canvas.offsetWidth;
     canvas.height = canvas.offsetHeight;
+    ctx.putImageData(imageData, 0, 0);
 }
 
 function buildPalette() {
@@ -38,7 +41,6 @@ function buildPalette() {
         const btn = document.createElement('button');
         btn.style.background = c;
         btn.dataset.color = c;
-        btn.title = c;
         btn.onclick = () => {
             currentColor = c;
             grid.classList.remove('show');
@@ -59,7 +61,7 @@ function setupEvents() {
     };
 
     // збереження
-    document.getElementById('save-btn').onclick = saveImage;
+    document.getElementById('save-btn').onclick = saveToGallery;
 
     // малювання
     canvas.addEventListener('pointerdown', startDrawing);
@@ -81,23 +83,34 @@ function setTool(tool) {
 }
 
 function startDrawing(e) {
-    e.preventDefault();
     isDrawing = true;
+    const rect = canvas.getBoundingClientRect();
+    lastX = e.clientX - rect.left;
+    lastY = e.clientY - rect.top;
     draw(e);
 }
 
 function draw(e) {
     if (!isDrawing) return;
+    e.preventDefault();
+
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
     ctx.globalCompositeOperation = currentTool === 'eraser' ? 'destination-out' : 'source-over';
-    ctx.fillStyle = currentTool === 'pen' ? currentColor : '#222';
+    ctx.strokeStyle = currentTool === 'pen' ? currentColor : '#222';
+    ctx.lineWidth = BRUSH_SIZE;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
 
     ctx.beginPath();
-    ctx.arc(x, y, BRUSH_SIZE / 2, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+
+    lastX = x;
+    lastY = y;
 
     saveArt(); // автозбереження
 }
@@ -116,31 +129,46 @@ function loadArt() {
     const saved = localStorage.getItem('morstrix_paint');
     if (saved) {
         const img = new Image();
-        img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        img.onload = () => {
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        };
         img.src = saved;
     }
 }
 
-async function saveImage() {
+// === ЗБЕРЕЖЕННЯ В ГАЛЕРЕЮ ===
+async function saveToGallery() {
     saveArt(); // спочатку в localStorage
-    const dataUrl = canvas.toDataURL('image/png');
 
-    // --- КОПІЮВАННЯ В БУФЕР (десктоп) ---
-    if (navigator.clipboard && navigator.clipboard.write) {
+    const dataUrl = canvas.toDataURL('image/png');
+    const blob = await (await fetch(dataUrl)).blob();
+
+    // 1. Спроба: File System Access API (Chrome/Edge Android)
+    if ('showSaveFilePicker' in window) {
         try {
-            const blob = await (await fetch(dataUrl)).blob();
-            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-            alert('Зображення скопійовано в буфер обмена!');
+            const handle = await window.showSaveFilePicker({
+                suggestedName: `morstrix_paint_${Date.now()}.png`,
+                types: [{ description: 'PNG Image', accept: { 'image/png': ['.png'] } }]
+            });
+            const writable = await handle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            alert('Збережено в галерею!');
             return;
-        } catch (e) { console.warn('Clipboard API не спрацював', e); }
+        } catch (e) { console.warn('File System API не спрацював', e); }
     }
 
-    // --- ЗАВАНТАЖЕННЯ НА ТЕЛЕФОН ---
+    // 2. Резерв: завантаження через <a>
     const a = document.createElement('a');
     a.href = dataUrl;
     a.download = `morstrix_paint_${Date.now()}.png`;
     a.click();
-    alert('Зображення завантажено на пристрій!');
+    alert('Зображення завантажено! Перевір "Завантаження" або галерею.');
+
+    // 3. Додатково: спроба через Telegram WebApp (якщо підтримує)
+    if (WebApp && WebApp.saveFile) {
+        WebApp.saveFile(blob, `morstrix_paint_${Date.now()}.png`);
+    }
 }
 
 // === СТАРТ ===
