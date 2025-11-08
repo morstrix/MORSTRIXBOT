@@ -7,104 +7,52 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="drafts.js" defer></script>
     <style>
-        :root {
-            --bg: #000;
-            --border: #0f0;
-            --text: #0f0;
+        :root {--bg:#000; --border:#0f0; --text:#0f0;}
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{background:var(--bg);color:var(--text);font-family:monospace;overflow:hidden;}
+        #paint-canvas{display:block;width:100%;height:calc(100vh - 70px);}
+        .toolbar{
+            position:fixed;bottom:0;left:0;right:0;
+            background:rgba(0,0,0,0.9);padding:8px;
+            display:flex;justify-content:center;align-items:center;
+            gap:10px;border-top:2px solid var(--border);
         }
-        * { margin:0; padding:0; box-sizing:border-box; }
-        body {
-            background: var(--bg);
-            color: var(--text);
-            font-family: 'Courier New', monospace;
-            overflow: hidden;
-            touch-action: none;
+        .btn{
+            width:48px;height:48px;border:2px solid var(--border);
+            background:#111;color:var(--text);cursor:pointer;
+            font-size:24px;display:flex;align-items:center;justify-content:center;
         }
-        #canvas-container {
-            position: fixed;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            border: 3px solid var(--border);
-            background: #111;
-            box-shadow: 0 0 15px #0f0;
+        .btn.active{box-shadow:0 0 12px var(--border);}
+        .palette{
+            position:relative;
         }
-        #paint-canvas {
-            display: block;
-            background: #222;
+        .palette-grid{
+            position:absolute;bottom:58px;left:50%;transform:translateX(-50%);
+            background:#111;border:2px solid var(--border);padding:6px;
+            display:grid;grid-template-columns:repeat(4,30px);gap:4px;
+            visibility:hidden;opacity:0;transition:opacity .2s;
         }
-        .toolbar {
-            position: fixed;
-            bottom: 0; left: 0; right: 0;
-            background: rgba(0,0,0,0.9);
-            padding: 10px;
-            display: flex;
-            justify-content: center;
-            flex-wrap: wrap;
-            gap: 8px;
-            border-top: 2px solid var(--border);
+        .palette-grid.show{visibility:visible;opacity:1;}
+        .palette-grid button{
+            width:30px;height:30px;border:none;cursor:pointer;
         }
-        .tool-btn, .color-btn {
-            width: 40px; height: 40px;
-            border: 2px solid var(--border);
-            background: #111;
-            cursor: pointer;
-            font-size: 12px;
-            color: var(--text);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .color-btn {
-            padding: 0;
-        }
-        .color-btn.active {
-            box-shadow: 0 0 10px #0f0;
-            transform: scale(1.1);
-        }
-        .tool-btn:active, .color-btn:active {
-            transform: scale(0.95);
-        }
-        #save-btn, #clear-btn, #send-btn {
-            background: #008000;
-            color: #000;
-            font-weight: bold;
-        }
+        #save-btn{background:#008000;color:#000;font-weight:bold;}
     </style>
 </head>
 <body>
 
-<div id="canvas-container">
-    <canvas id="paint-canvas"></canvas>
-</div>
+<canvas id="paint-canvas"></canvas>
 
 <div class="toolbar">
-    <button id="tool-pen" class="tool-btn active" title="Кисть">BRUSH</button>
-    <button id="tool-eraser" class="tool-btn" title="Ластик">ERASER</button>
-    
-    <div style="width:1px; background:var(--border); margin:0 5px;"></div>
+    <button id="tool-pen" class="btn active" title="Кисть">✎</button>
+    <button id="tool-eraser" class="btn" title="Ластик">✖</button>
 
-    <button class="color-btn active" style="background:#ffffff" data-color="#ffffff"></button>
-    <button class="color-btn" style="background:#000000" data-color="#000000"></button>
-    <button class="color-btn" style="background:#ff0000" data-color="#ff0000"></button>
-    <button class="color-btn" style="background:#00ff00" data-color="#00ff00"></button>
-    <button class="color-btn" style="background:#0000ff" data-color="#0000ff"></button>
-    <button class="color-btn" style="background:#ffff00" data-color="#ffff00"></button>
-    <button class="color-btn" style="background:#ff00ff" data-color="#ff00ff"></button>
-    <button class="color-btn" style="background:#00ffff" data-color="#00ffff"></button>
-    <button class="color-btn" style="background:#ff8800" data-color="#ff8800"></button>
-    <button class="color-btn" style="background:#88ff00" data-color="#88ff00"></button>
-    <button class="color-btn" style="background:#0088ff" data-color="#0088ff"></button>
-    <button class="color-btn" style="background:#ff0088" data-color="#ff0088"></button>
-    <button class="color-btn" style="background:#8800ff" data-color="#8800ff"></button>
-    <button class="color-btn" style="background:#00ff88" data-color="#00ff88"></button>
-    <button class="color-btn" style="background:#888888" data-color="#888888"></button>
-    <button class="color-btn" style="background:#444444" data-color="#444444"></button>
+    <div class="palette">
+        <button id="palette-btn" class="btn" title="Палітра">🎨</button>
+        <div id="palette-grid" class="palette-grid"></div>
+    </div>
 
-    <div style="width:1px; background:var(--border); margin:0 5px;"></div>
-
-    <button id="clear-btn" class="tool-btn">ОЧИСТИТИ</button>
-    <button id="save-btn" class="tool-btn">ЗБЕРЕГТИ</button>
-    <button id="send-btn" class="tool-btn">ВІДПРАВИТИ</button>
+    <button id="save-btn" class="btn">💾</button>
 </div>
 
 </body>

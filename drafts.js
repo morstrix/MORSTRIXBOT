@@ -1,8 +1,11 @@
 const WebApp = window.Telegram.WebApp;
 
 // === КОНФІГ ===
-const CANVAS_SIZE = 600; // фіксований розмір полотна
-const BRUSH_SIZE = 8;
+const BRUSH_SIZE = 12;
+const COLORS = [
+    '#ffffff','#000000','#ff0000','#00ff00','#0000ff','#ffff00','#ff00ff','#00ffff',
+    '#ff8800','#88ff00','#0088ff','#ff0088','#8800ff','#00ff88','#888888','#444444'
+];
 
 // === СТАН ===
 let canvas, ctx;
@@ -14,76 +17,66 @@ let currentTool = 'pen'; // 'pen' | 'eraser'
 function init() {
     canvas = document.getElementById('paint-canvas');
     ctx = canvas.getContext('2d');
-    canvas.width = CANVAS_SIZE;
-    canvas.height = CANVAS_SIZE;
-
-    // Масштабування під екран
-    const container = document.getElementById('canvas-container');
-    const maxDim = Math.min(window.innerWidth, window.innerHeight) * 0.8;
-    const scale = maxDim / CANVAS_SIZE;
-    const scaledSize = CANVAS_SIZE * scale;
-    container.style.width = scaledSize + 'px';
-    container.style.height = scaledSize + 'px';
+    resizeCanvas();
 
     ctx.fillStyle = '#222';
-    ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     loadArt();
     setupEvents();
+    buildPalette();
+}
+
+function resizeCanvas() {
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+}
+
+function buildPalette() {
+    const grid = document.getElementById('palette-grid');
+    COLORS.forEach(c => {
+        const btn = document.createElement('button');
+        btn.style.background = c;
+        btn.dataset.color = c;
+        btn.title = c;
+        btn.onclick = () => {
+            currentColor = c;
+            grid.classList.remove('show');
+            if (currentTool === 'eraser') setTool('pen');
+        };
+        grid.appendChild(btn);
+    });
 }
 
 function setupEvents() {
-    // Інструменти
+    // інструменти
     document.getElementById('tool-pen').onclick = () => setTool('pen');
     document.getElementById('tool-eraser').onclick = () => setTool('eraser');
 
-    // Кольори
-    document.querySelectorAll('.color-btn').forEach(btn => {
-        btn.onclick = () => {
-            document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            currentColor = btn.dataset.color;
-            if (currentTool === 'eraser') setTool('pen');
-        };
-    });
-
-    // Кнопки
-    document.getElementById('clear-btn').onclick = () => {
-        if (confirm('Очистити полотно?')) {
-            ctx.fillStyle = '#222';
-            ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-            saveArt();
-        }
+    // палітра
+    document.getElementById('palette-btn').onclick = () => {
+        document.getElementById('palette-grid').classList.toggle('show');
     };
 
-    document.getElementById('save-btn').onclick = () => {
-        saveArt();
-        alert('Малюнок збережено!');
-    };
+    // збереження
+    document.getElementById('save-btn').onclick = saveImage;
 
-    document.getElementById('send-btn').onclick = () => {
-        saveArt();
-        const dataUrl = canvas.toDataURL('image/png');
-        const payload = dataUrl.split(',')[1]; // base64
-        const data = `PAINT|${payload}`;
-        if (WebApp) {
-            WebApp.sendData(data);
-            WebApp.close();
-        } else {
-            alert('Відправлено (тест): ' + data.substring(0, 50) + '...');
-        }
-    };
-
-    // Малювання
+    // малювання
     canvas.addEventListener('pointerdown', startDrawing);
     canvas.addEventListener('pointermove', draw);
     canvas.addEventListener('pointerup', stopDrawing);
     canvas.addEventListener('pointerleave', stopDrawing);
+
+    window.addEventListener('resize', () => {
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        resizeCanvas();
+        ctx.putImageData(imgData, 0, 0);
+    });
 }
 
 function setTool(tool) {
     currentTool = tool;
-    document.querySelectorAll('[id^="tool-"]').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#tool-pen,#tool-eraser').forEach(b => b.classList.remove('active'));
     document.getElementById('tool-' + tool).classList.add('active');
 }
 
@@ -101,6 +94,7 @@ function draw(e) {
 
     ctx.globalCompositeOperation = currentTool === 'eraser' ? 'destination-out' : 'source-over';
     ctx.fillStyle = currentTool === 'pen' ? currentColor : '#222';
+
     ctx.beginPath();
     ctx.arc(x, y, BRUSH_SIZE / 2, 0, Math.PI * 2);
     ctx.fill();
@@ -115,20 +109,39 @@ function stopDrawing() {
 // === ЗБЕРЕЖЕННЯ ===
 function saveArt() {
     const dataUrl = canvas.toDataURL('image/png');
-    localStorage.setItem('morstrix_paint_art', dataUrl);
+    localStorage.setItem('morstrix_paint', dataUrl);
 }
 
 function loadArt() {
-    const saved = localStorage.getItem('morstrix_paint_art');
+    const saved = localStorage.getItem('morstrix_paint');
     if (saved) {
         const img = new Image();
-        img.onload = () => {
-            ctx.drawImage(img, 0, 0);
-        };
+        img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         img.src = saved;
     }
 }
 
+async function saveImage() {
+    saveArt(); // спочатку в localStorage
+    const dataUrl = canvas.toDataURL('image/png');
+
+    // --- КОПІЮВАННЯ В БУФЕР (десктоп) ---
+    if (navigator.clipboard && navigator.clipboard.write) {
+        try {
+            const blob = await (await fetch(dataUrl)).blob();
+            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+            alert('Зображення скопійовано в буфер обмена!');
+            return;
+        } catch (e) { console.warn('Clipboard API не спрацював', e); }
+    }
+
+    // --- ЗАВАНТАЖЕННЯ НА ТЕЛЕФОН ---
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = `morstrix_paint_${Date.now()}.png`;
+    a.click();
+    alert('Зображення завантажено на пристрій!');
+}
+
 // === СТАРТ ===
 window.addEventListener('load', init);
-window.addEventListener('resize', () => setTimeout(init, 100));
