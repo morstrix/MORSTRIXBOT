@@ -3,10 +3,9 @@ const WebApp = window.Telegram.WebApp;
 // === КОНФІГ ===
 const BRUSH_SIZE = 6;   // маленька кисть
 const ERASER_SIZE = 20;
-const COLORS = [
-    '#ffffff','#000000','#ff0000','#00ff00','#0000ff','#ffff00','#ff00ff','#00ffff',
-    '#ff8800','#88ff00','#0088ff','#ff0088','#8800ff','#00ff88','#888888','#444444'
-];
+
+// ❌ КОНСТАНТА COLORS (ВИДАЛЕНО), ТЕПЕР ВИКОРИСТОВУЄТЬСЯ <input type="color">
+// const COLORS = [ ... ];
 
 // === СТАН ===
 let canvas, ctx;
@@ -26,7 +25,7 @@ function init() {
 
     loadArt();
     setupEvents();
-    buildPalette();
+    // ❌ ВИДАЛЕНО buildPalette();
 }
 
 function resizeCanvas() {
@@ -36,27 +35,22 @@ function resizeCanvas() {
     ctx.putImageData(imgData, 0, 0);
 }
 
-function buildPalette() {
-    const grid = document.getElementById('palette-grid');
-    COLORS.forEach(c => {
-        const btn = document.createElement('button');
-        btn.style.background = c;
-        btn.dataset.color = c;
-        btn.onclick = () => {
-            currentColor = c;
-            grid.classList.remove('show');
-            if (currentTool === 'eraser') setTool('pen');
-        };
-        grid.appendChild(btn);
-    });
-}
+// ❌ ФУНКЦІЯ buildPalette() (ВИДАЛЕНО)
+// function buildPalette() { ... }
 
 function setupEvents() {
     document.getElementById('tool-pen').onclick = () => setTool('pen');
     document.getElementById('tool-eraser').onclick = () => setTool('eraser');
-    document.getElementById('palette-btn').onclick = () => {
-        document.getElementById('palette-grid').classList.toggle('show');
-    };
+    
+    // ✅ НОВА КНОПКА: Очистити
+    document.getElementById('tool-clear').onclick = clearAll;
+
+    // ✅ НОВА ПАЛІТРА: <input type="color">
+    document.getElementById('color-picker').addEventListener('input', changeColor);
+    
+    // ❌ СТАРА ПАЛІТРА (ВИДАЛЕНО)
+    // document.getElementById('palette-btn').onclick = () => { ... };
+    
     document.getElementById('send-btn').onclick = sendToBot;
 
     canvas.addEventListener('pointerdown', startDrawing);
@@ -78,12 +72,7 @@ function setTool(tool) {
 }
 
 function startDrawing(e) {
-    /* ✅ ФІКС: 
-        Додатково запобігаємо стандартній поведінці 
-        (початок скролінгу) при першому дотику.
-    */
     e.preventDefault();
-
     isDrawing = true;
     const rect = canvas.getBoundingClientRect();
     lastX = e.clientX - rect.left;
@@ -92,7 +81,7 @@ function startDrawing(e) {
 
 function draw(e) {
     if (!isDrawing) return;
-    e.preventDefault(); // Залишаємо це також для надійності
+    e.preventDefault();
 
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -103,7 +92,14 @@ function draw(e) {
     ctx.globalCompositeOperation = currentTool === 'eraser' ? 'destination-out' : 'source-over';
     ctx.lineWidth = size;
     ctx.lineCap = 'round';
-    ctx.strokeStyle = currentTool === 'pen' ? currentColor : '#222';
+
+    // ✅ ФІКС: Стирачка тепер не малює кольором фону,
+    // а використовує 'destination-out' для справжнього стирання.
+    // 'strokeStyle' тепер завжди бере 'currentColor'.
+    ctx.strokeStyle = currentColor; 
+    
+    // ❌ СТАРИЙ КОД:
+    // ctx.strokeStyle = currentTool === 'pen' ? currentColor : '#222';
 
     ctx.beginPath();
     ctx.moveTo(lastX, lastY);
@@ -119,6 +115,43 @@ function draw(e) {
 function stopDrawing() {
     isDrawing = false;
 }
+
+// === ✅ НОВІ ФУНКЦІЇ ===
+
+/**
+ * Обробляє вибір кольору з <input type="color">
+ */
+function changeColor(e) {
+    currentColor = e.target.value;
+    // Якщо обрали колір, автоматично вмикаємо пензель
+    if (currentTool === 'eraser') {
+        setTool('pen');
+    }
+}
+
+/**
+ * Очищує все полотно з підтвердженням
+ */
+function clearAll() {
+    const doClear = () => {
+        ctx.fillStyle = '#222';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        saveArt();
+    };
+
+    // Використовуємо нативне підтвердження Telegram, якщо доступно
+    if (WebApp && WebApp.platform !== 'unknown') {
+        WebApp.showConfirm('Очистити все полотно? Цю дію не можна скасувати.', (isOk) => {
+            if (isOk) doClear();
+        });
+    } else {
+        // Fallback для звичайного браузера
+        if (confirm('Очистити все полотно? Цю дію не можна скасувати.')) {
+            doClear();
+        }
+    }
+}
+
 
 // === ЗБЕРЕЖЕННЯ ===
 function saveArt() {
