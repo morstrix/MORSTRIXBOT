@@ -1,22 +1,21 @@
 const WebApp = window.Telegram.WebApp;
 
-// === КОНФІГ ===
-const BRUSH_SIZE = 12;
-const ERASER_SIZE = 30;
-const INTERPOLATION_STEP = 4; // крок інтерполяції (чим менше — плавніше)
+// === КОНФИГ ===
+const BRUSH_SIZE = 14;
+const ERASER_SIZE = 40;
 const COLORS = [
     '#ffffff','#000000','#ff0000','#00ff00','#0000ff','#ffff00','#ff00ff','#00ffff',
     '#ff8800','#88ff00','#0088ff','#ff0088','#8800ff','#00ff88','#888888','#444444'
 ];
 
-// === СТАН ===
+// === СОСТОЯНИЕ ===
 let canvas, ctx;
 let isDrawing = false;
 let currentColor = '#ffffff';
 let currentTool = 'pen';
 let lastX = 0, lastY = 0;
 
-// === ІНІЦІАЛІЗАЦІЯ ===
+// === ИНИЦИАЛИЗАЦИЯ ===
 function init() {
     canvas = document.getElementById('paint-canvas');
     ctx = canvas.getContext('2d');
@@ -53,6 +52,7 @@ function buildPalette() {
 }
 
 function setupEvents() {
+    // Инструменты
     document.getElementById('tool-pen').onclick = () => setTool('pen');
     document.getElementById('tool-eraser').onclick = () => setTool('eraser');
     document.getElementById('palette-btn').onclick = () => {
@@ -60,8 +60,9 @@ function setupEvents() {
     };
     document.getElementById('save-btn').onclick = saveToGallery;
 
+    // Малювання
     canvas.addEventListener('pointerdown', startDrawing);
-    canvas.addEventListener('pointermove', drawWithInterpolation);
+    canvas.addEventListener('pointermove', draw);
     canvas.addEventListener('pointerup', stopDrawing);
     canvas.addEventListener('pointerleave', stopDrawing);
 
@@ -85,7 +86,7 @@ function startDrawing(e) {
     lastY = e.clientY - rect.top;
 }
 
-function drawWithInterpolation(e) {
+function draw(e) {
     if (!isDrawing) return;
     e.preventDefault();
 
@@ -93,29 +94,6 @@ function drawWithInterpolation(e) {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    // === ІНТЕРПОЛЯЦІЯ ===
-    const dx = x - lastX;
-    const dy = y - lastY;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    const steps = Math.max(1, Math.floor(distance / INTERPOLATION_STEP));
-
-    for (let i = 1; i <= steps; i++) {
-        const interpX = lastX + (dx * i) / steps;
-        const interpY = lastY + (dy * i) / steps;
-        drawLineSegment(lastX, lastY, interpX, interpY);
-        lastX = interpX;
-        lastY = interpY;
-    }
-
-    // Остання точка
-    drawLineSegment(lastX, lastY, x, y);
-    lastX = x;
-    lastY = y;
-
-    saveArt();
-}
-
-function drawLineSegment(x1, y1, x2, y2) {
     const size = currentTool === 'eraser' ? ERASER_SIZE : BRUSH_SIZE;
 
     ctx.globalCompositeOperation = currentTool === 'eraser' ? 'destination-out' : 'source-over';
@@ -124,16 +102,21 @@ function drawLineSegment(x1, y1, x2, y2) {
     ctx.strokeStyle = currentTool === 'pen' ? currentColor : '#222';
 
     ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(x, y);
     ctx.stroke();
+
+    lastX = x;
+    lastY = y;
+
+    saveArt();
 }
 
 function stopDrawing() {
     isDrawing = false;
 }
 
-// === ЗБЕРЕЖЕННЯ ===
+// === СОХРАНЕНИЕ ===
 function saveArt() {
     const dataUrl = canvas.toDataURL('image/png');
     localStorage.setItem('morstrix_paint', dataUrl);
@@ -153,21 +136,23 @@ function loadArt() {
     }
 }
 
-// === ЗБЕРЕЖЕННЯ В ГАЛЕРЕЮ ===
+// === СОХРАНЕНИЕ В ГАЛЕРЕЮ ===
 async function saveToGallery() {
     saveArt();
 
     canvas.toBlob(async (blob) => {
         const file = new File([blob], `morstrix_${Date.now()}.png`, { type: 'image/png' });
 
+        // 1. Android/iOS — share
         if (navigator.share && navigator.canShare?.({ files: [file] })) {
             try {
-                await navigator.share({ files: [file] });
+                await navigator.share({ files: [file], title: 'Paint' });
                 alert('Збережено в галерею!');
                 return;
             } catch (e) {}
         }
 
+        // 2. Копіювання в буфер
         if (navigator.clipboard?.write) {
             try {
                 await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
@@ -176,6 +161,7 @@ async function saveToGallery() {
             } catch (e) {}
         }
 
+        // 3. Download
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;

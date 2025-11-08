@@ -1,60 +1,6 @@
-<!DOCTYPE html>
-<html lang="uk">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="mobile-web-app-capable" content="yes">
-    <title>MORSTRIX | PAINT</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="drafts.js" defer></script>
-    <style>
-        :root {--bg:#000; --border:#0f0; --text:#0f0;}
-        *{margin:0;padding:0;box-sizing:border-box;}
-        body{background:var(--bg);color:var(--text);font-family:monospace;overflow:hidden;}
-        #paint-canvas{display:block;width:100%;height:calc(100vh - 70px);}
-        .toolbar{
-            position:fixed;bottom:0;left:0;right:0;
-            background:rgba(0,0,0,0.9);padding:8px;
-            display:flex;justify-content:center;align-items:center;
-            gap:10px;border-top:2px solid var(--border);
-        }
-        .btn{
-            width:48px;height:48px;border:2px solid var(--border);
-            background:#111;color:var(--text);cursor:pointer;
-            font-size:24px;display:flex;align-items:center;justify-content:center;
-        }
-        .btn.active{box-shadow:0 0 12px var(--border);}
-        .palette{
-            position:relative;
-        }
-        .palette-grid{
-            position:absolute;bottom:58px;left:50%;transform:translateX(-50%);
-            background:#111;border:2px solid var(--border);padding:6px;
-            display:grid;grid-template-columns:repeat(4,30px);gap:4px;
-            visibility:hidden;opacity:0;transition:opacity .2s;
-        }
-        .palette-grid.show{visibility:visible;opacity:1;}
-        .palette-grid button{
-            width:30px;height:30px;border:none;cursor:pointer;
-        }
-        #save-btn{background:#008000;color:#000;font-weight:bold;}
-    </style>
-</head>
-<body>
-
-<canvas id="paint-canvas"></canvas>
-
-<div class="toolbar">
-    <button id="tool-pen" class="btn active" title="Кисть">✎</button>
-    <button id="tool-eraser" class="btn" title="Ластик">✖</button>
-
-    <div class="palette">
-        <button id="palette-btn" class="btn" title="Палітра">🎨</button>
-        <div id="palette-grid" class="palette-grid"></div>
-    </div>
-
-    <button id="save-btn" class="btn">💾</button>
-</div>
-
-</body>
-</html>
+<script>
+    const script = document.createElement('script');
+    script.src = 'drafts.js?v=' + Date.now();
+    script.defer = true;
+    document.head.appendChild(script);
+</script>
