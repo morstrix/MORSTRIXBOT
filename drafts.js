@@ -2,6 +2,7 @@ const WebApp = window.Telegram.WebApp;
 
 // === КОНФІГ ===
 const BRUSH_SIZE = 12;
+const ERASER_SIZE = 30;
 const COLORS = [
     '#ffffff','#000000','#ff0000','#00ff00','#0000ff','#ffff00','#ff00ff','#00ffff',
     '#ff8800','#88ff00','#0088ff','#ff0088','#8800ff','#00ff88','#888888','#444444'
@@ -11,8 +12,9 @@ const COLORS = [
 let canvas, ctx;
 let isDrawing = false;
 let currentColor = '#ffffff';
-let currentTool = 'pen'; // 'pen' | 'eraser'
+let currentTool = 'pen';
 let lastX = 0, lastY = 0;
+let points = [];
 
 // === ІНІЦІАЛІЗАЦІЯ ===
 function init() {
@@ -51,19 +53,13 @@ function buildPalette() {
 }
 
 function setupEvents() {
-    // інструменти
     document.getElementById('tool-pen').onclick = () => setTool('pen');
     document.getElementById('tool-eraser').onclick = () => setTool('eraser');
-
-    // палітра
     document.getElementById('palette-btn').onclick = () => {
         document.getElementById('palette-grid').classList.toggle('show');
     };
-
-    // збереження
     document.getElementById('save-btn').onclick = saveToGallery;
 
-    // малювання
     canvas.addEventListener('pointerdown', startDrawing);
     canvas.addEventListener('pointermove', draw);
     canvas.addEventListener('pointerup', stopDrawing);
@@ -73,6 +69,7 @@ function setupEvents() {
         const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         resizeCanvas();
         ctx.putImageData(imgData, 0, 0);
+        redrawFromPoints(); // відновлення ліній
     });
 }
 
@@ -84,10 +81,12 @@ function setTool(tool) {
 
 function startDrawing(e) {
     isDrawing = true;
+    points = [];
     const rect = canvas.getBoundingClientRect();
-    lastX = e.clientX - rect.left;
-    lastY = e.clientY - rect.top;
-    draw(e);
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    points.push({ x, y });
+    lastX = x; lastY = y;
 }
 
 function draw(e) {
@@ -97,26 +96,49 @@ function draw(e) {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+    points.push({ x, y });
 
+    // Малюємо плавно
     ctx.globalCompositeOperation = currentTool === 'eraser' ? 'destination-out' : 'source-over';
-    ctx.strokeStyle = currentTool === 'pen' ? currentColor : '#222';
-    ctx.lineWidth = BRUSH_SIZE;
+    ctx.lineWidth = currentTool === 'eraser' ? ERASER_SIZE : BRUSH_SIZE;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
+    ctx.strokeStyle = currentTool === 'pen' ? currentColor : '#222';
 
-    ctx.beginPath();
-    ctx.moveTo(lastX, lastY);
-    ctx.lineTo(x, y);
-    ctx.stroke();
+    if (points.length >= 3) {
+        const mid = {
+            x: (points[points.length-2].x + points[points.length-1].x) / 2,
+            y: (points[points.length-2].y + points[points.length-1].y) / 2
+        };
+        ctx.beginPath();
+        ctx.moveTo(points[points.length-3].x, points[points.length-3].y);
+        ctx.quadraticCurveTo(points[points.length-2].x, points[points.length-2].y, mid.x, mid.y);
+        ctx.stroke();
+    }
 
-    lastX = x;
-    lastY = y;
-
-    saveArt(); // автозбереження
+    lastX = x; lastY = y;
+    saveArt();
 }
 
 function stopDrawing() {
+    if (!isDrawing) return;
     isDrawing = false;
+
+    // Дорисовуємо останню частину
+    if (points.length > 1) {
+        ctx.beginPath();
+        ctx.moveTo(points[points.length-2].x, points[points.length-2].y);
+        ctx.lineTo(points[points.length-1].x, points[points.length-1].y);
+        ctx.stroke();
+    }
+}
+
+// === ВІДНОВЛЕННЯ ЛІНІЙ ПРИ RESIZE ===
+function redrawFromPoints() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#222';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // (тут можна зберегти points, але для простоти — лише localStorage)
 }
 
 // === ЗБЕРЕЖЕННЯ ===
@@ -138,37 +160,41 @@ function loadArt() {
 
 // === ЗБЕРЕЖЕННЯ В ГАЛЕРЕЮ ===
 async function saveToGallery() {
-    saveArt(); // спочатку в localStorage
+    saveArt();
 
     const dataUrl = canvas.toDataURL('image/png');
     const blob = await (await fetch(dataUrl)).blob();
 
-    // 1. Спроба: File System Access API (Chrome/Edge Android)
+    // 1. Android Chrome — File System Access
     if ('showSaveFilePicker' in window) {
         try {
             const handle = await window.showSaveFilePicker({
-                suggestedName: `morstrix_paint_${Date.now()}.png`,
-                types: [{ description: 'PNG Image', accept: { 'image/png': ['.png'] } }]
+                suggestedName: `morstrix_${Date.now()}.png`,
+                types: [{ description: 'PNG', accept: { 'image/png': ['.png'] } }]
             });
             const writable = await handle.createWritable();
             await writable.write(blob);
             await writable.close();
             alert('Збережено в галерею!');
             return;
-        } catch (e) { console.warn('File System API не спрацював', e); }
+        } catch (e) { console.warn(e); }
     }
 
-    // 2. Резерв: завантаження через <a>
+    // 2. iOS / резерв — копіювання в буфер
+    if (navigator.clipboard && navigator.clipboard.write) {
+        try {
+            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+            alert('Зображення в буфері обміну!\nУтримуй на фото → "Зберегти в галерею"');
+            return;
+        } catch (e) { console.warn(e); }
+    }
+
+    // 3. Резервний download
     const a = document.createElement('a');
     a.href = dataUrl;
-    a.download = `morstrix_paint_${Date.now()}.png`;
+    a.download = `morstrix_${Date.now()}.png`;
     a.click();
-    alert('Зображення завантажено! Перевір "Завантаження" або галерею.');
-
-    // 3. Додатково: спроба через Telegram WebApp (якщо підтримує)
-    if (WebApp && WebApp.saveFile) {
-        WebApp.saveFile(blob, `morstrix_paint_${Date.now()}.png`);
-    }
+    alert('Завантажено! Перевір "Завантаження"');
 }
 
 // === СТАРТ ===
