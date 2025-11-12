@@ -1,4 +1,4 @@
-# main.py — POLLING (головний) + HTTP-сервер (фон)
+# main.py — POLLING + HTTP-сервер для Render
 
 import os
 import asyncio
@@ -117,7 +117,7 @@ def main():
         app.run_polling(
             drop_pending_updates=True,
             allowed_updates=[
-                "message", "callback_query", "chat_join_request",
+                "message", "callback_query", "chat_join_request",  # ✅ ДОДАНО: chat_join_request
                 "my_chat_member", "chat_member", "web_app_data"
             ]
         )
