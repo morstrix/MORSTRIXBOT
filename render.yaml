@@ -5,12 +5,10 @@ services:
     region: oregon
     plan: free
     pythonVersion: "3.11"
-    buildCommand: pip install -r requirements.txt && pip install "python-telegram-bot[webhooks,job-queue]"
+    buildCommand: pip install -r requirements.txt
     startCommand: python main.py
     envVars:
       RENDER: "true"
-      RENDER_EXTERNAL_URL: "https://your-service.onrender.com"  # ← ЗАМІНИ НА СВІЙ URL
       TELEGRAM_BOT_TOKEN: "YOUR_BOT_TOKEN"
-      # інші змінні...
     autoDeploy: true
     healthCheckPath: /health

@@ -1,4 +1,4 @@
-# main.py
+# main.py — ГІБРИД: webhook + polling ТІЛЬКИ для chat_join_request
 
 import os
 import asyncio
@@ -14,7 +14,7 @@ from telegram.constants import ParseMode
 from dotenv import load_dotenv
 from aiohttp import web
 
-# === Імпорти модулів ===
+# === Імпорти ===
 from ai import handle_gemini_message_group, handle_gemini_message_private
 from handlers import (
     handle_new_members, handle_join_request, handle_callback_query,
@@ -26,10 +26,7 @@ from safe import check_links
 # ========================================
 # ЛОГУВАННЯ
 # ========================================
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ========================================
@@ -38,19 +35,14 @@ logger = logging.getLogger(__name__)
 if os.getenv("RENDER") != "true":
     load_dotenv()
 
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 PORT = int(os.environ.get("PORT", 8080))
 
-if not TELEGRAM_BOT_TOKEN:
-    raise ValueError("TELEGRAM_BOT_TOKEN не знайдено!")
-
 # ========================================
-# КОМАНДА /start (без Web App кнопки)
+# /start
 # ========================================
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("ПРАВИЛА", callback_data="show_rules")]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
     await update.message.reply_text(
         "ᴡᴇʟᴄᴏᴍᴇ \n\n"
         "➞ ᴀʙᴛᴏᴘᴘийᴏᴍ зᴀяʙᴏᴋ\n"
@@ -58,112 +50,93 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "➞ /font - ᴛᴇᴋᴄᴛ ᴄᴛᴀйʌᴇᴘ\n\n"
         "➞ ШІ — дʌя чʌᴇніʙ ᴋʌубу (ᴀʌᴏ)\n"
         "➞ ᴘᴀɪɴᴛ ᴀᴘᴘ (ᴘʀᴏᴛᴏᴛʏᴘᴇ)",
-        reply_markup=reply_markup,
+        reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode=ParseMode.MARKDOWN
     )
 
 # ========================================
-# РЕЄСТРАЦІЯ ОБРОБНИКІВ
+# ОСНОВНІ ОБРОБНИКИ (для webhook)
 # ========================================
-def setup_handlers(application: Application):
-    application.add_handler(CommandHandler("start", start_command))
-
-    # FONT
-    font_conv_handler = ConversationHandler(
+def setup_main_handlers(app: Application):
+    app.add_handler(CommandHandler("start", start_command))
+    app.add_handler(ConversationHandler(
         entry_points=[CommandHandler("font", font_start)],
         states={0: [MessageHandler(filters.TEXT & ~filters.COMMAND, font_get_text)]},
         fallbacks=[CommandHandler("cancel", font_cancel)],
         allow_reentry=True
-    )
-    application.add_handler(font_conv_handler)
-
-    application.add_handler(CallbackQueryHandler(handle_callback_query))
-    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members))
-    
-    # ✅ ВИПРАВЛЕНО: callback передається явно
-    application.add_handler(ChatJoinRequestHandler(callback=handle_join_request))
-
-    # КРИТИЧНО: Прийом даних з Mini App (Main App)
-    application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_web_app_data))
-
-    # Gemini AI
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_gemini_message_private))
-    application.add_handler(MessageHandler(
+    ))
+    app.add_handler(CallbackQueryHandler(handle_callback_query))
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members))
+    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_web_app_data))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_gemini_message_private))
+    app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND & filters.Regex(r'(?i)ало') & filters.ChatType.GROUPS,
         handle_gemini_message_group
     ))
-
-    # Safe Links
     link_filters = filters.Entity("url") | filters.Entity("text_link")
-    application.add_handler(MessageHandler(link_filters & filters.ChatType.GROUPS, check_links))
+    app.add_handler(MessageHandler(link_filters & filters.ChatType.GROUPS, check_links))
+
+# ========================================
+# ОКРЕМИЙ POLLING ДЛЯ chat_join_request
+# ========================================
+async def run_join_request_polling():
+    app = Application.builder().token(TOKEN).build()
+    app.add_handler(ChatJoinRequestHandler(handle_join_request))
+    
+    logger.info("=== POLLING ДЛЯ chat_join_request ЗАПУЩЕНО ===")
+    await app.run_polling(
+        allowed_updates=["chat_join_request"],
+        drop_pending_updates=True
+    )
 
 # ========================================
 # WEBHOOK SERVER
 # ========================================
-async def start_webhook_server(application: Application):
-    app = web.Application()
+async def start_webhook():
+    app = Application.builder().token(TOKEN).job_queue(JobQueue()).build()
+    setup_main_handlers(app)
+    
+    await app.initialize()
+    await app.start()
 
-    webhook_path = f'/webhook_{TELEGRAM_BOT_TOKEN}'
-    async def telegram_webhook(request):
-        try:
-            data = await request.json()
-            update = Update.de_json(data, application.bot)
-            await application.update_queue.put(update)
-            return web.Response(text="OK", status=200)
-        except Exception as e:
-            logger.error(f"Webhook error: {e}")
-            return web.Response(text="Error", status=500)
+    webhook_url = f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}/webhook_{TOKEN}"
+    await app.bot.set_webhook(
+        url=webhook_url,
+        drop_pending_updates=True,
+        allowed_updates=["message", "callback_query", "my_chat_member", "web_app_data"]
+    )
+    logger.info(f"Webhook встановлено: {webhook_url}")
 
-    app.router.add_post(webhook_path, telegram_webhook)
+    # Запускаємо aiohttp сервер
+    web_app = web.Application()
+    web_app.router.add_post(f'/webhook_{TOKEN}', lambda req: app.update_queue.put(Update.de_json(req.json(), app.bot)))
+    web_app.router.add_get('/', lambda req: web.Response(text="OK"))
+    web_app.router.add_get('/health', lambda req: web.Response(text="OK"))
 
-    async def health(request):
-        return web.Response(text="MORSTRIX BOT IS ALIVE", status=200)
-    app.router.add_get('/', health)
-    app.router.add_get('/health', health)
-
-    app['bot_app'] = application
-
-    await application.initialize()
-    setup_handlers(application)
-
-    webhook_url = f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}{webhook_path}"
-    logger.info(f"Встановлюю вебхук: {webhook_url}")
-    try:
-        # ✅ ДОДАНО: allowed_updates для chat_join_request та інших подій
-        await application.bot.set_webhook(
-            url=webhook_url, 
-            drop_pending_updates=True,
-            allowed_updates=['chat_join_request', 'message', 'callback_query', 'my_chat_member']
-        )
-        logger.info("Вебхук встановлено з allowed_updates!")
-    except Exception as e:
-        logger.error(f"Помилка вебхука: {e}")
-
-    runner = web.AppRunner(app)
+    runner = web.AppRunner(web_app)
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', PORT)
     await site.start()
-    logger.info(f"Сервер запущено: 0.0.0.0:{PORT}")
+    logger.info("Webhook сервер запущено")
 
-    await application.start()
-    await asyncio.Future()
+    # Запускаємо polling для join request
+    asyncio.create_task(run_join_request_polling())
+
+    await asyncio.Event().wait()  # Тримаємо процес живим
 
 # ========================================
 # ЗАПУСК
 # ========================================
-application = Application.builder().token(TELEGRAM_BOT_TOKEN).job_queue(JobQueue()).build()
-
 def main():
     if os.getenv("RENDER") == "true":
-        logger.info("=== RENDER: WEBHOOK MODE ===")
-        asyncio.run(start_webhook_server(application))
+        logger.info("=== RENDER: ГІБРИДНИЙ РЕЖИМ (webhook + polling) ===")
+        asyncio.run(start_webhook())
     else:
-        logger.info("=== LOCAL: POLLING MODE ===")
-        setup_handlers(application)
-        application.run_polling()
+        logger.info("=== LOCAL: POLLING ===")
+        app = Application.builder().token(TOKEN).build()
+        setup_main_handlers(app)
+        app.add_handler(ChatJoinRequestHandler(handle_join_request))
+        app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        logger.critical(f"Критична помилка: {e}", exc_info=True)
+    main()
