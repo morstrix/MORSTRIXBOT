@@ -147,7 +147,8 @@ async def font_get_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         await update.message.reply_text("Порожньо. Введіть текст або /cancel.")
         return FONT_TEXT
 
-    converted = convert_text_to_font(user_text)
+    # Тепер convert_text_to_font повертає готовий блок \`\`\`текст\`\`\`
+    converted_block = convert_text_to_font(user_text)
 
     # Видаляємо старі повідомлення
     for key in ['font_command_id', 'font_bot_request_id']:
@@ -158,12 +159,15 @@ async def font_get_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         await context.bot.delete_message(chat_id=chat_id, message_id=update.message.message_id)
     except: pass
 
+    # Надсилаємо блок коду — з’явиться кнопка «Копіювати»
     await context.bot.send_message(
         chat_id=chat_id,
-        text=converted,
+        text=converted_block,
+        parse_mode=ParseMode.MARKDOWN_V2,   # ← обов’язково V2
         message_thread_id=update.message.message_thread_id
     )
     return ConversationHandler.END
+# --------------------------------------------------
 
 
 async def font_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -174,5 +178,5 @@ async def font_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
             await context.bot.delete_message(chat_id=chat_id, message_id=context.user_data.get(key))
         except: pass
 
-    await update.message.reply_text("❌ Скасовано.", message_thread_id=update.message.message_thread_id)
+    await update.message.reply_text("Скасовано.", message_thread_id=update.message.message_thread_id)
     return ConversationHandler.END
