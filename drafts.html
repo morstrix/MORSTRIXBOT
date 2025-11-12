@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MORSTRIX | DRAW</title>
+    <title>MORSTRIX | PAINT</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        :root {--bg:#000; --border:#0f0; --text:#0f0;}
+        :root {--bg:#000; --border:#0f0; --text:#0f0; --accent:#008000;}
         *{margin:0;padding:0;box-sizing:border-box;}
         html, body {
             touch-action: none;
@@ -15,6 +15,7 @@
             user-select: none;
             background:var(--bg);
             overflow:hidden;
+            font-family: system-ui, sans-serif;
         }
         #paint-canvas{
             display:block;
@@ -24,16 +25,22 @@
         }
         .toolbar{
             position:fixed;bottom:0;left:0;right:0;
-            background:rgba(0,0,0,0.9);padding:8px;
+            background:rgba(0,0,0,0.92);padding:8px;
             display:flex;justify-content:center;align-items:center;
-            gap:12px;border-top:2px solid var(--border);
+            gap:10px;border-top:2px solid var(--border);
+            flex-wrap: wrap;
         }
         .btn{
             width:44px;height:44px;border:2px solid var(--border);
             background:#111;color:var(--text);cursor:pointer;
-            font-size:22px;display:flex;align-items:center;justify-content:center;
+            font-size:20px;display:flex;align-items:center;justify-content:center;
+            border-radius:8px;
+            transition: all 0.2s;
         }
-        .btn.active{box-shadow:0 0 10px var(--border);}
+        .btn:active{transform:scale(0.9);}
+        .btn.active{box-shadow:0 0 12px var(--border); background:#222;}
+        .btn.disabled{opacity:0.3; cursor:not-allowed;}
+        
         #color-picker {
             -webkit-appearance: none;
             -moz-appearance: none;
@@ -44,11 +51,24 @@
             width: 44px;
             height: 44px;
             cursor: pointer;
+            border-radius:8px;
         }
-        #color-picker::-webkit-color-swatch-wrapper {padding:4px;}
-        #color-picker::-webkit-color-swatch {border:2px solid #555;border-radius:0;}
-        #color-picker::-moz-color-swatch {border:2px solid #555;border-radius:0;padding:4px;}
-        #send-btn{background:#008000;color:#000;font-weight:bold;}
+        #color-picker::-webkit-color-swatch-wrapper {padding:3px;}
+        #color-picker::-webkit-color-swatch {border:2px solid #555;border-radius:4px;}
+        #color-picker::-moz-color-swatch {border:2px solid #555;border-radius:4px;padding:3px;}
+
+        .size-control {
+            display:flex;align-items:center;gap:6px;background:#111;
+            border:2px solid var(--border);border-radius:8px;padding:0 8px;
+        }
+        .size-btn{font-size:18px;width:32px;height:32px;}
+
+        #size-value {
+            min-width:24px;text-align:center;font-weight:bold;
+            color:var(--text);font-size:14px;
+        }
+
+        #send-btn{background:var(--accent);color:#000;font-weight:bold;border-radius:8px;}
     </style>
 </head>
 <body>
@@ -56,10 +76,21 @@
 <canvas id="paint-canvas"></canvas>
 
 <div class="toolbar">
-    <button id="tool-pen" class="btn active">✎</button>
-    <button id="tool-eraser" class="btn">✖</button>
-    <button id="tool-clear" class="btn">🗑</button>
-    <input type="color" id="color-picker" class="btn" value="#ffffff">
+    <button id="tool-pen" class="btn active" title="Пензель">✎</button>
+    <button id="tool-eraser" class="btn" title="Стирачка">✖</button>
+    
+    <div class="size-control">
+        <button id="size-minus" class="btn size-btn" title="Менше">−</button>
+        <span id="size-value">8</span>
+        <button id="size-plus" class="btn size-btn" title="Більше">+</button>
+    </div>
+
+    <input type="color" id="color-picker" class="btn" value="#ffffff" title="Колір">
+
+    <button id="tool-undo" class="btn" title="Скасувати">↺</button>
+    <button id="tool-redo" class="btn" title="Повторити">↻</button>
+    <button id="tool-clear" class="btn" title="Очистити">🗑</button>
+    
     <button id="send-btn" class="btn">✔</button>
 </div>
 
