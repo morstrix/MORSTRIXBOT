@@ -1,4 +1,4 @@
-# main.py — POLLING + HTTP-сервер для Render
+# main.py — POLLING (головний) + HTTP-сервер (фон)
 
 import os
 import asyncio
@@ -100,36 +100,32 @@ async def start_http_server():
     logger.info(f"HTTP-сервер запущено на порту {PORT}")
 
 # ========================================
-# POLLING
-# ========================================
-async def run_polling():
-    app = Application.builder().token(TOKEN).build()
-    setup_handlers(app)
-    logger.info("=== POLLING ЗАПУЩЕНО ===")
-    await app.run_polling(
-        drop_pending_updates=True,
-        allowed_updates=[
-            "message", "callback_query", "chat_join_request",
-            "my_chat_member", "chat_member", "web_app_data"
-        ]
-    )
-
-# ========================================
 # ЗАПУСК
 # ========================================
-async def main():
-    # Запускаємо HTTP-сервер і polling паралельно
-    await asyncio.gather(
-        start_http_server(),
-        run_polling()
-    )
-
-if __name__ == "__main__":
+def main():
     if os.getenv("RENDER") == "true":
         logger.info("=== RENDER: POLLING + HTTP HEALTH CHECK ===")
-        asyncio.run(main())
+        
+        # Запускаємо HTTP-сервер у фоні
+        loop = asyncio.get_event_loop()
+        loop.create_task(start_http_server())
+        
+        # Запускаємо polling у головному потоці
+        app = Application.builder().token(TOKEN).build()
+        setup_handlers(app)
+        
+        app.run_polling(
+            drop_pending_updates=True,
+            allowed_updates=[
+                "message", "callback_query", "chat_join_request",
+                "my_chat_member", "chat_member", "web_app_data"
+            ]
+        )
     else:
         logger.info("=== LOCAL: POLLING ===")
         app = Application.builder().token(TOKEN).build()
         setup_handlers(app)
         app.run_polling(drop_pending_updates=True)
+
+if __name__ == "__main__":
+    main()
