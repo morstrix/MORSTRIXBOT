@@ -28,6 +28,12 @@ function init() {
     loadArt();
     setupEvents();
     updateSizeDisplay();
+
+    if (WebApp) {
+        WebApp.ready();
+        WebApp.expand();
+        WebApp.BackButton.show();
+    }
 }
 
 function resizeCanvas() {
@@ -44,9 +50,7 @@ function setupEvents() {
     document.getElementById('tool-undo').onclick = undo;
     document.getElementById('tool-redo').onclick = redo;
     document.getElementById('color-picker').addEventListener('input', changeColor);
-    document.getElementById('send-btn').onclick = sendToBot;
 
-    // Розмір пензля
     document.getElementById('size-minus').onclick = () => changeSize(-1);
     document.getElementById('size-plus').onclick = () => changeSize(1);
 
@@ -63,14 +67,35 @@ function setupEvents() {
 
     document.body.style.touchAction = 'none';
     canvas.style.touchAction = 'none';
+
+    // Автозакриття при натисканні "Назад"
+    if (WebApp) {
+        WebApp.onEvent('backButtonClicked', () => {
+            sendArtAndClose();
+        });
+    }
+
+    // Автозакриття при закритті вікна
+    window.addEventListener('beforeunload', () => {
+        if (WebApp && !WebApp.isClosing) {
+            sendArtAndClose();
+        }
+    });
+}
+
+function sendArtAndClose() {
+    saveArt();
+    const dataUrl = canvas.toDataURL('image/png');
+    const payload = dataUrl.split(',')[1];
+    const data = `ART|morstrix_art_${Date.now()}|${payload}`;
+    WebApp.sendData(data);
+    WebApp.close();
 }
 
 function setTool(tool) {
     currentTool = tool;
     document.querySelectorAll('#tool-pen,#tool-eraser').forEach(b => b.classList.remove('active'));
     document.getElementById('tool-' + tool).classList.add('active');
-    
-    // Авто-розмір при зміні інструменту
     currentSize = currentTool === 'pen' ? DEFAULT_BRUSH : DEFAULT_ERASER;
     updateSizeDisplay();
 }
@@ -95,7 +120,7 @@ function startDrawing(e) {
     const rect = canvas.getBoundingClientRect();
     lastX = e.clientX - rect.left;
     lastY = e.clientY - rect.top;
-    saveState(); // Початок малювання — зберігаємо стан
+    saveState();
 }
 
 function draw(e) {
@@ -129,7 +154,7 @@ function draw(e) {
 function stopDrawing() {
     if (isDrawing) {
         isDrawing = false;
-        saveState(); // Кінець лінії — зберігаємо
+        saveState();
     }
 }
 
@@ -198,25 +223,11 @@ function loadArt() {
             ctx.fillStyle = '#222';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            saveState(); // Після завантаження — початковий стан
+            saveState();
         };
         img.src = saved;
     } else {
-        saveState(); // Порожнє полотно
-    }
-}
-
-function sendToBot() {
-    saveArt();
-    const dataUrl = canvas.toDataURL('image/png');
-    const payload = dataUrl.split(',')[1];
-    const data = `ART|morstrix_art_${Date.now()}|${payload}`;
-
-    if (WebApp) {
-        WebApp.sendData(data);
-        WebApp.close();
-    } else {
-        alert('Відправлено: ' + data.substring(0, 50) + '...');
+        saveState();
     }
 }
 
