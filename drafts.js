@@ -9,7 +9,7 @@ const MAX_LAYERS = 5;
 
 // === СТАН ===
 let canvas, ctx;
-let layers = []; // Масив шарів: {canvas, ctx, visible, name}
+let layers = [];
 let activeLayerIndex = 0;
 let isDrawing = false;
 let currentColor = '#ffffff';
@@ -18,6 +18,7 @@ let currentSize = DEFAULT_BRUSH;
 let lastX = 0, lastY = 0;
 let undoStack = [];
 let redoStack = [];
+let layersPanelVisible = true; // ← НОВЕ: стан панелі
 
 // === ІНІЦІАЛІЗАЦІЯ ===
 function init() {
@@ -25,7 +26,6 @@ function init() {
     ctx = canvas.getContext('2d');
     resizeCanvas();
 
-    // Створюємо перший шар
     createLayer('Фон');
     setActiveLayer(0);
 
@@ -33,6 +33,7 @@ function init() {
     setupEvents();
     updateSizeDisplay();
     updateLayersUI();
+    updateLayersPanelVisibility();
 
     if (WebApp) {
         WebApp.ready();
@@ -47,7 +48,6 @@ function resizeCanvas() {
     canvas.height = canvas.offsetHeight;
     ctx.putImageData(imgData, 0, 0);
 
-    // Оновлюємо всі шари
     layers.forEach(layer => {
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = layer.canvas.width;
@@ -80,10 +80,6 @@ function createLayer(name = 'Шар') {
         visible: true,
         name: `${name} ${layers.length + 1}`
     });
-
-    if (layers.length === 1) {
-        activeLayerIndex = 0;
-    }
 
     updateLayersUI();
     renderAll();
@@ -157,6 +153,7 @@ function setupEvents() {
     document.getElementById('size-minus').onclick = () => changeSize(-1);
     document.getElementById('size-plus').onclick = () => changeSize(1);
     document.getElementById('add-layer').onclick = () => createLayer();
+    document.getElementById('toggle-layers').onclick = toggleLayersPanel; // ← НОВЕ
 
     canvas.addEventListener('pointerdown', startDrawing);
     canvas.addEventListener('pointermove', draw);
@@ -182,6 +179,23 @@ function setupEvents() {
             sendArtAndClose();
         }
     });
+}
+
+function toggleLayersPanel() {
+    layersPanelVisible = !layersPanelVisible;
+    updateLayersPanelVisibility();
+}
+
+function updateLayersPanelVisibility() {
+    const panel = document.querySelector('.layers-panel');
+    const toggleBtn = document.getElementById('toggle-layers');
+    if (layersPanelVisible) {
+        panel.style.transform = 'translateX(0)';
+        toggleBtn.innerHTML = '◀';
+    } else {
+        panel.style.transform = 'translateX(100%)';
+        toggleBtn.innerHTML = '▶';
+    }
 }
 
 function sendArtAndClose() {

@@ -73,6 +73,8 @@
             position: fixed; top: 0; right: 0; width: 200px; height: 100vh;
             background: rgba(0,0,0,0.9); border-left: 2px solid var(--border);
             padding: 12px; overflow-y: auto; font-size: 12px;
+            transition: transform 0.3s ease;
+            transform: translateX(0);
         }
         .layers-header {
             display: flex; justify-content: space-between; align-items: center;
@@ -88,17 +90,30 @@
         .layer-item.active {border-color: var(--border); background: #222;}
         .layer-btn {
             width: 24px; height: 24px; background: #222; border: none;
-            color: var(--text); font-size: 14px; cursor: pointer;;
+            color: var(--text); font-size: 14px; cursor: pointer;
             border-radius: 4px; display: flex; align-items: center; justify-content: center;
         }
         .layer-btn:hover {background: #333;}
         .layer-controls {margin-left: auto; display: flex; gap: 2px;}
         .layer-name {flex: 1; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+
+        /* КНОПКА ПРИХОВАННЯ ПАНЕЛІ */
+        #toggle-layers {
+            position: fixed; top: 50%; right: 0; transform: translateY(-50%);
+            width: 32px; height: 64px; background: rgba(0,0,0,0.8);
+            border: 2px solid var(--border); border-right: none;
+            color: var(--text); font-size: 18px; cursor: pointer;
+            border-radius: 8px 0 0 8px; z-index: 1000;
+            display: flex; align-items: center; justify-content: center;
+        }
     </style>
 </head>
 <body>
 
 <canvas id="paint-canvas"></canvas>
+
+<!-- КНОПКА ПРИХОВАННЯ -->
+<button id="toggle-layers" class="btn">◀</button>
 
 <!-- ПАНЕЛЬ ШАРІВ -->
 <div class="layers-panel">
@@ -122,6 +137,7 @@
 
     <input type="color" id="color-picker" class="btn" value="#ffffff" title="Колір">
 
+    <!-- UNDO/REDO В ОДНОМУ РЯДКУ -->
     <button id="tool-undo" class="btn" title="Скасувати">↺</button>
     <button id="tool-redo" class="btn" title="Повторити">↻</button>
     <button id="tool-clear" class="btn" title="Очистити шар">🗑</button>
