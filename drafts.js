@@ -49,7 +49,6 @@ function setupEvents() {
         ctx.putImageData(imgData, 0, 0);
     });
 
-    // Запобігаємо скролінню на iOS
     document.body.style.touchAction = 'none';
     canvas.style.touchAction = 'none';
 }
@@ -78,14 +77,17 @@ function draw(e) {
 
     const size = currentTool === 'eraser' ? ERASER_SIZE : BRUSH_SIZE;
 
-    ctx.globalCompositeOperation = currentTool === 'eraser' ? 'destination-out' : 'source-over';
-    ctx.lineWidth = size;
-    ctx.lineCap = 'round';
-
-    // Тільки при pen встановлюємо колір
-    if (currentTool === 'pen') {
+    // ВИПРАВЛЕНО: composite + strokeStyle
+    if (currentTool === 'eraser') {
+        ctx.globalCompositeOperation = 'destination-out';
+        // ВАЖЛИВО: НЕ встановлюємо strokeStyle при стиранні
+    } else {
+        ctx.globalCompositeOperation = 'source-over';
         ctx.strokeStyle = currentColor;
     }
+
+    ctx.lineWidth = size;
+    ctx.lineCap = 'round';
 
     ctx.beginPath();
     ctx.moveTo(lastX, lastY);
@@ -151,7 +153,6 @@ function sendToBot() {
     const dataUrl = canvas.toDataURL('image/png');
     const payload = dataUrl.split(',')[1];
 
-    // Формат: ART|ключ|base64
     const data = `ART|morstrix_art_${Date.now()}|${payload}`;
 
     if (WebApp) {
