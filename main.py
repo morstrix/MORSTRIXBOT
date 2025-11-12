@@ -79,7 +79,9 @@ def setup_handlers(application: Application):
 
     application.add_handler(CallbackQueryHandler(handle_callback_query))
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members))
-    application.add_handler(ChatJoinRequestHandler(handle_join_request))
+    
+    # ✅ ВИПРАВЛЕНО: callback передається явно
+    application.add_handler(ChatJoinRequestHandler(callback=handle_join_request))
 
     # КРИТИЧНО: Прийом даних з Mini App (Main App)
     application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_web_app_data))
