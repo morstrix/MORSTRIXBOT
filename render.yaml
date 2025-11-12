@@ -1,14 +1,15 @@
+# render.yaml
 services:
   - type: web
     name: MORSTRIXBOT
     env: python
     region: oregon
     plan: free
-    pythonVersion: "3.11"
+    pythonVersion: "3.13"
     buildCommand: pip install -r requirements.txt
     startCommand: python main.py
     envVars:
       RENDER: "true"
-      TELEGRAM_BOT_TOKEN: "YOUR_BOT_TOKEN"
+      TELEGRAM_BOT_TOKEN: "YOUR_TOKEN"
     autoDeploy: true
-    healthCheckPath: /health
+    # healthCheckPath: видалено — не потрібно для polling
