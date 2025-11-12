@@ -8,7 +8,14 @@
     <style>
         :root {--bg:#000; --border:#0f0; --text:#0f0;}
         *{margin:0;padding:0;box-sizing:border-box;}
-        body{background:var(--bg);overflow:hidden;}
+        html, body {
+            touch-action: none;
+            overscroll-behavior: none;
+            -webkit-user-select: none;
+            user-select: none;
+            background:var(--bg);
+            overflow:hidden;
+        }
         #paint-canvas{
             display:block;
             width:100%;
@@ -27,36 +34,20 @@
             font-size:22px;display:flex;align-items:center;justify-content:center;
         }
         .btn.active{box-shadow:0 0 10px var(--border);}
-        
-        /* ✅ НОВІ СТИЛІ ДЛЯ ПАЛІТРИ <input type="color"> */
         #color-picker {
             -webkit-appearance: none;
             -moz-appearance: none;
             appearance: none;
-            padding: 0; /* Скидаємо внутрішні відступи */
-            background: #111; /* Фон, як у кнопок */
-            border: 2px solid var(--border); /* Рамка, як у кнопок */
+            padding: 0;
+            background: #111;
+            border: 2px solid var(--border);
             width: 44px;
             height: 44px;
             cursor: pointer;
         }
-        /* Внутрішній квадрат кольору для Chrome/Safari */
-        #color-picker::-webkit-color-swatch-wrapper {
-            padding: 4px; 
-        }
-        #color-picker::-webkit-color-swatch {
-            border: 2px solid #555; 
-            border-radius: 0;
-        }
-        /* Внутрішній квадрат кольору для Firefox */
-        #color-picker::-moz-color-swatch {
-             border: 2px solid #555;
-             border-radius: 0;
-             padding: 4px;
-        }
-        
-        /* ❌ СТАРІ СТИЛІ ПАЛІТРИ (ВИДАЛЕНО) */
-        
+        #color-picker::-webkit-color-swatch-wrapper {padding:4px;}
+        #color-picker::-webkit-color-swatch {border:2px solid #555;border-radius:0;}
+        #color-picker::-moz-color-swatch {border:2px solid #555;border-radius:0;padding:4px;}
         #send-btn{background:#008000;color:#000;font-weight:bold;}
     </style>
 </head>
@@ -67,11 +58,8 @@
 <div class="toolbar">
     <button id="tool-pen" class="btn active">✎</button>
     <button id="tool-eraser" class="btn">✖</button>
-    
     <button id="tool-clear" class="btn">🗑</button>
-    
     <input type="color" id="color-picker" class="btn" value="#ffffff">
-    
     <button id="send-btn" class="btn">✔</button>
 </div>
 

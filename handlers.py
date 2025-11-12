@@ -2,6 +2,7 @@
 
 import os
 import json
+import base64
 import logging
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, ConversationHandler
@@ -30,21 +31,22 @@ async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE
     parts = data_string.split('|', 2)
 
     if len(parts) < 3:
-        await update.effective_message.reply_text("❌ Помилка: Невірний формат даних.")
+        await update.effective_message.reply_text("Помилка: Невірний формат даних.")
         return
 
-    draft_type, full_item_key, json_payload = parts
+    draft_type, full_item_key, base64_payload = parts
 
     if draft_type == 'ART':
         try:
-            json.loads(json_payload)  # Перевірка валідності
+            # Валідація base64
+            base64.b64decode(base64_payload, validate=True)
             await update.effective_message.reply_text(
-                f"🎨 Арт (Ключ: `{full_item_key}`) прийнято!\n"
+                f"Арт (Ключ: `{full_item_key}`) прийнято!\n"
                 f"*Надіслано для обробки.*",
                 parse_mode=ParseMode.MARKDOWN
             )
         except Exception as e:
-            await update.effective_message.reply_text("❌ Помилка при обробці арту.")
+            await update.effective_message.reply_text("Помилка при обробці арту.")
             logger.error(f"ART error: {e}")
 
 
@@ -64,7 +66,7 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
         # Повідомлення 1
         await context.bot.send_message(
             user_id,
-            f"✅ {user_full_name}! зᴀпит схвᴀʌᴇно.",
+            f"{user_full_name}! зᴀпит схвᴀʌᴇно.",
             parse_mode=ParseMode.MARKDOWN
         )
 
@@ -167,7 +169,6 @@ async def font_get_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         message_thread_id=update.message.message_thread_id
     )
     return ConversationHandler.END
-# --------------------------------------------------
 
 
 async def font_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:

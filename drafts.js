@@ -1,11 +1,8 @@
 const WebApp = window.Telegram.WebApp;
 
 // === КОНФІГ ===
-const BRUSH_SIZE = 6;   // маленька кисть
+const BRUSH_SIZE = 6;
 const ERASER_SIZE = 20;
-
-// ❌ КОНСТАНТА COLORS (ВИДАЛЕНО), ТЕПЕР ВИКОРИСТОВУЄТЬСЯ <input type="color">
-// const COLORS = [ ... ];
 
 // === СТАН ===
 let canvas, ctx;
@@ -25,7 +22,6 @@ function init() {
 
     loadArt();
     setupEvents();
-    // ❌ ВИДАЛЕНО buildPalette();
 }
 
 function resizeCanvas() {
@@ -35,22 +31,11 @@ function resizeCanvas() {
     ctx.putImageData(imgData, 0, 0);
 }
 
-// ❌ ФУНКЦІЯ buildPalette() (ВИДАЛЕНО)
-// function buildPalette() { ... }
-
 function setupEvents() {
     document.getElementById('tool-pen').onclick = () => setTool('pen');
     document.getElementById('tool-eraser').onclick = () => setTool('eraser');
-    
-    // ✅ НОВА КНОПКА: Очистити
     document.getElementById('tool-clear').onclick = clearAll;
-
-    // ✅ НОВА ПАЛІТРА: <input type="color">
     document.getElementById('color-picker').addEventListener('input', changeColor);
-    
-    // ❌ СТАРА ПАЛІТРА (ВИДАЛЕНО)
-    // document.getElementById('palette-btn').onclick = () => { ... };
-    
     document.getElementById('send-btn').onclick = sendToBot;
 
     canvas.addEventListener('pointerdown', startDrawing);
@@ -63,6 +48,10 @@ function setupEvents() {
         resizeCanvas();
         ctx.putImageData(imgData, 0, 0);
     });
+
+    // Запобігаємо скролінню на iOS
+    document.body.style.touchAction = 'none';
+    canvas.style.touchAction = 'none';
 }
 
 function setTool(tool) {
@@ -93,13 +82,10 @@ function draw(e) {
     ctx.lineWidth = size;
     ctx.lineCap = 'round';
 
-    // ✅ ФІКС: Стирачка тепер не малює кольором фону,
-    // а використовує 'destination-out' для справжнього стирання.
-    // 'strokeStyle' тепер завжди бере 'currentColor'.
-    ctx.strokeStyle = currentColor; 
-    
-    // ❌ СТАРИЙ КОД:
-    // ctx.strokeStyle = currentTool === 'pen' ? currentColor : '#222';
+    // Тільки при pen встановлюємо колір
+    if (currentTool === 'pen') {
+        ctx.strokeStyle = currentColor;
+    }
 
     ctx.beginPath();
     ctx.moveTo(lastX, lastY);
@@ -109,29 +95,20 @@ function draw(e) {
     lastX = x;
     lastY = y;
 
-    saveArt(); // автозбереження
+    saveArt();
 }
 
 function stopDrawing() {
     isDrawing = false;
 }
 
-// === ✅ НОВІ ФУНКЦІЇ ===
-
-/**
- * Обробляє вибір кольору з <input type="color">
- */
 function changeColor(e) {
     currentColor = e.target.value;
-    // Якщо обрали колір, автоматично вмикаємо пензель
     if (currentTool === 'eraser') {
         setTool('pen');
     }
 }
 
-/**
- * Очищує все полотно з підтвердженням
- */
 function clearAll() {
     const doClear = () => {
         ctx.fillStyle = '#222';
@@ -139,21 +116,17 @@ function clearAll() {
         saveArt();
     };
 
-    // Використовуємо нативне підтвердження Telegram, якщо доступно
     if (WebApp && WebApp.platform !== 'unknown') {
         WebApp.showConfirm('Очистити все полотно? Цю дію не можна скасувати.', (isOk) => {
             if (isOk) doClear();
         });
     } else {
-        // Fallback для звичайного браузера
         if (confirm('Очистити все полотно? Цю дію не можна скасувати.')) {
             doClear();
         }
     }
 }
 
-
-// === ЗБЕРЕЖЕННЯ ===
 function saveArt() {
     const dataUrl = canvas.toDataURL('image/png');
     localStorage.setItem('morstrix_draw', dataUrl);
@@ -173,12 +146,14 @@ function loadArt() {
     }
 }
 
-// === ВІДПРАВКА У БОТ ===
 function sendToBot() {
     saveArt();
     const dataUrl = canvas.toDataURL('image/png');
-    const payload = dataUrl.split(',')[1]; // base64
-    const data = `PAINT|${payload}`;
+    const payload = dataUrl.split(',')[1];
+
+    // Формат: ART|ключ|base64
+    const data = `ART|morstrix_art_${Date.now()}|${payload}`;
+
     if (WebApp) {
         WebApp.sendData(data);
         WebApp.close();
@@ -187,5 +162,4 @@ function sendToBot() {
     }
 }
 
-// === СТАРТ ===
 window.addEventListener('load', init);
