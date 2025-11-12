@@ -53,7 +53,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         "ᴡᴇʟᴄᴏᴍᴇ \n\n"
-        "➞ ᴀʙᴛᴏпᴘийᴏᴍ зᴀяʙᴏᴋ\n"
+        "➞ ᴀʙᴛᴏᴘᴘийᴏᴍ зᴀяʙᴏᴋ\n"
         "➞ пᴇᴘᴇʙіᴘᴋᴀ пᴏᴄиʌᴀнь\n"
         "➞ /font - ᴛᴇᴋᴄᴛ ᴄᴛᴀйʌᴇᴘ\n\n"
         "➞ ШІ — дʌя чʌᴇніʙ ᴋʌубу (ᴀʌᴏ)\n"
@@ -129,8 +129,13 @@ async def start_webhook_server(application: Application):
     webhook_url = f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}{webhook_path}"
     logger.info(f"Встановлюю вебхук: {webhook_url}")
     try:
-        await application.bot.set_webhook(url=webhook_url, drop_pending_updates=True)
-        logger.info("Вебхук встановлено!")
+        # ✅ ДОДАНО: allowed_updates для chat_join_request та інших подій
+        await application.bot.set_webhook(
+            url=webhook_url, 
+            drop_pending_updates=True,
+            allowed_updates=['chat_join_request', 'message', 'callback_query', 'my_chat_member']
+        )
+        logger.info("Вебхук встановлено з allowed_updates!")
     except Exception as e:
         logger.error(f"Помилка вебхука: {e}")
 

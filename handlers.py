@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 # === 1. Web App: тільки ART (рисовалка) ===
 async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обробляє дані з DRAFTZ — тільки піксельний арт."""
     web_app_data = update.effective_message.web_app_data
     if not web_app_data:
         return
@@ -51,6 +52,9 @@ async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 # === 2. АВТОСХВАЛЕННЯ ЗАЯВКИ + ЛС (3 повідомлення) + ПРИВІТАННЯ ===
 async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # ✅ ДОДАНО: Лог на вхід для діагностики (чи приходить подія)
+    logger.info("=== ВХІД У handle_join_request: подія chat_join_request ОТРИМАНА ===")
+
     # 1. Отримуємо об’єкт заявки
     join_req = update.chat_join_request
     if not join_req:
@@ -79,13 +83,13 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
     try:
         await context.bot.send_message(
             user_id,
-            f"✅ {full_name}! зᴀпит схвᴀʌᴇно.",
+            f"{full_name}! зᴀпит схвᴀʌᴇно.",
             parse_mode=ParseMode.MARKDOWN
         )
         await context.bot.send_message(
             user_id,
             "шᴏ я ᴍᴏжу?\n\n"
-            "➞ ᴀʙᴛᴏпᴘийᴏᴍ зᴀяʙᴏᴋ\n"
+            "➞ ᴀʙᴛᴏᴘᴘийᴏᴍ зᴀяʙᴏᴋ\n"
             "➞ ʙᴇʌᴋᴀᴍ з пᴘᴀʙиʌᴀᴍи\n"
             "➞ пᴇᴘᴇʙіᴘᴋᴀ пᴏᴄиʌᴀнь\n"
             "➞ /font - ᴛᴇᴋᴄᴛ ᴄᴛᴀйʌᴇᴘ\n"
