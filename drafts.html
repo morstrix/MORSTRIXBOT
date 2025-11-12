@@ -67,12 +67,49 @@
             min-width:24px;text-align:center;font-weight:bold;
             color:var(--text);font-size:14px;
         }
+
+        /* ПАНЕЛЬ ШАРІВ */
+        .layers-panel {
+            position: fixed; top: 0; right: 0; width: 200px; height: 100vh;
+            background: rgba(0,0,0,0.9); border-left: 2px solid var(--border);
+            padding: 12px; overflow-y: auto; font-size: 12px;
+        }
+        .layers-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 8px; color: var(--text); font-weight: bold;
+        }
+        #add-layer {width: 32px; height: 32px; font-size: 18px;}
+        .layers-list {display: flex; flex-direction: column; gap: 6px;}
+        .layer-item {
+            display: flex; align-items: center; gap: 6px;
+            background: #111; border: 1px solid #333; border-radius: 6px;
+            padding: 4px; font-size: 11px;
+        }
+        .layer-item.active {border-color: var(--border); background: #222;}
+        .layer-btn {
+            width: 24px; height: 24px; background: #222; border: none;
+            color: var(--text); font-size: 14px; cursor: pointer;;
+            border-radius: 4px; display: flex; align-items: center; justify-content: center;
+        }
+        .layer-btn:hover {background: #333;}
+        .layer-controls {margin-left: auto; display: flex; gap: 2px;}
+        .layer-name {flex: 1; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
     </style>
 </head>
 <body>
 
 <canvas id="paint-canvas"></canvas>
 
+<!-- ПАНЕЛЬ ШАРІВ -->
+<div class="layers-panel">
+    <div class="layers-header">
+        <span>ШАРИ</span>
+        <button id="add-layer" class="btn">+</button>
+    </div>
+    <div id="layers-list" class="layers-list"></div>
+</div>
+
+<!-- ПАНЕЛЬ ІНСТРУМЕНТІВ -->
 <div class="toolbar">
     <button id="tool-pen" class="btn active" title="Пензель">✎</button>
     <button id="tool-eraser" class="btn" title="Стирачка">✖</button>
@@ -87,7 +124,7 @@
 
     <button id="tool-undo" class="btn" title="Скасувати">↺</button>
     <button id="tool-redo" class="btn" title="Повторити">↻</button>
-    <button id="tool-clear" class="btn" title="Очистити">🗑</button>
+    <button id="tool-clear" class="btn" title="Очистити шар">🗑</button>
 </div>
 
 <script>

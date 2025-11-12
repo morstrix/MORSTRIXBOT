@@ -5,9 +5,12 @@ const BRUSH_SIZES = [4, 8, 12, 16, 24];
 const ERASER_SIZES = [12, 20, 30, 40, 60];
 const DEFAULT_BRUSH = 8;
 const DEFAULT_ERASER = 20;
+const MAX_LAYERS = 5;
 
 // === СТАН ===
 let canvas, ctx;
+let layers = []; // Масив шарів: {canvas, ctx, visible, name}
+let activeLayerIndex = 0;
 let isDrawing = false;
 let currentColor = '#ffffff';
 let currentTool = 'pen';
@@ -22,12 +25,14 @@ function init() {
     ctx = canvas.getContext('2d');
     resizeCanvas();
 
-    ctx.fillStyle = '#222';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Створюємо перший шар
+    createLayer('Фон');
+    setActiveLayer(0);
 
     loadArt();
     setupEvents();
     updateSizeDisplay();
+    updateLayersUI();
 
     if (WebApp) {
         WebApp.ready();
@@ -41,18 +46,117 @@ function resizeCanvas() {
     canvas.width = canvas.offsetWidth;
     canvas.height = canvas.offsetHeight;
     ctx.putImageData(imgData, 0, 0);
+
+    // Оновлюємо всі шари
+    layers.forEach(layer => {
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = layer.canvas.width;
+        tempCanvas.height = layer.canvas.height;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.drawImage(layer.canvas, 0, 0);
+        layer.canvas.width = canvas.width;
+        layer.canvas.height = canvas.height;
+        layer.ctx = layer.canvas.getContext('2d');
+        layer.ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
+    });
 }
 
+function createLayer(name = 'Шар') {
+    if (layers.length >= MAX_LAYERS) return;
+
+    const layerCanvas = document.createElement('canvas');
+    layerCanvas.width = canvas.width;
+    layerCanvas.height = canvas.height;
+    const layerCtx = layerCanvas.getContext('2d');
+
+    if (layers.length === 0) {
+        layerCtx.fillStyle = '#222';
+        layerCtx.fillRect(0, 0, layerCanvas.width, layerCanvas.height);
+    }
+
+    layers.push({
+        canvas: layerCanvas,
+        ctx: layerCtx,
+        visible: true,
+        name: `${name} ${layers.length + 1}`
+    });
+
+    if (layers.length === 1) {
+        activeLayerIndex = 0;
+    }
+
+    updateLayersUI();
+    renderAll();
+}
+
+function setActiveLayer(index) {
+    if (index < 0 || index >= layers.length) return;
+    activeLayerIndex = index;
+    updateLayersUI();
+}
+
+function toggleLayerVisibility(index) {
+    if (index >= 0 && index < layers.length) {
+        layers[index].visible = !layers[index].visible;
+        updateLayersUI();
+        renderAll();
+    }
+}
+
+function deleteLayer(index) {
+    if (layers.length <= 1 || index < 0 || index >= layers.length) return;
+    layers.splice(index, 1);
+    if (activeLayerIndex >= layers.length) {
+        activeLayerIndex = layers.length - 1;
+    }
+    updateLayersUI();
+    renderAll();
+}
+
+function moveLayerUp(index) {
+    if (index < layers.length - 1) {
+        [layers[index], layers[index + 1]] = [layers[index + 1], layers[index]];
+        if (activeLayerIndex === index) activeLayerIndex++;
+        else if (activeLayerIndex === index + 1) activeLayerIndex--;
+        updateLayersUI();
+        renderAll();
+    }
+}
+
+function moveLayerDown(index) {
+    if (index > 0) {
+        [layers[index], layers[index - 1]] = [layers[index - 1], layers[index]];
+        if (activeLayerIndex === index) activeLayerIndex--;
+        else if (activeLayerIndex === index - 1) activeLayerIndex++;
+        updateLayersUI();
+        renderAll();
+    }
+}
+
+function getActiveLayer() {
+    return layers[activeLayerIndex];
+}
+
+function renderAll() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    layers.forEach(layer => {
+        if (layer.visible) {
+            ctx.drawImage(layer.canvas, 0, 0);
+        }
+    });
+}
+
+// === ПОДІЇ ===
 function setupEvents() {
     document.getElementById('tool-pen').onclick = () => setTool('pen');
     document.getElementById('tool-eraser').onclick = () => setTool('eraser');
-    document.getElementById('tool-clear').onclick = clearAll;
+    document.getElementById('tool-clear').onclick = clearActiveLayer;
     document.getElementById('tool-undo').onclick = undo;
     document.getElementById('tool-redo').onclick = redo;
     document.getElementById('color-picker').addEventListener('input', changeColor);
-
     document.getElementById('size-minus').onclick = () => changeSize(-1);
     document.getElementById('size-plus').onclick = () => changeSize(1);
+    document.getElementById('add-layer').onclick = () => createLayer();
 
     canvas.addEventListener('pointerdown', startDrawing);
     canvas.addEventListener('pointermove', draw);
@@ -63,19 +167,16 @@ function setupEvents() {
         const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         resizeCanvas();
         ctx.putImageData(imgData, 0, 0);
+        renderAll();
     });
 
     document.body.style.touchAction = 'none';
     canvas.style.touchAction = 'none';
 
-    // Автозакриття при натисканні "Назад"
     if (WebApp) {
-        WebApp.onEvent('backButtonClicked', () => {
-            sendArtAndClose();
-        });
+        WebApp.onEvent('backButtonClicked', sendArtAndClose);
     }
 
-    // Автозакриття при закритті вікна
     window.addEventListener('beforeunload', () => {
         if (WebApp && !WebApp.isClosing) {
             sendArtAndClose();
@@ -85,6 +186,7 @@ function setupEvents() {
 
 function sendArtAndClose() {
     saveArt();
+    renderAll();
     const dataUrl = canvas.toDataURL('image/png');
     const payload = dataUrl.split(',')[1];
     const data = `ART|morstrix_art_${Date.now()}|${payload}`;
@@ -131,24 +233,29 @@ function draw(e) {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
+    const layer = getActiveLayer();
+    const lctx = layer.ctx;
+
     if (currentTool === 'eraser') {
-        ctx.globalCompositeOperation = 'destination-out';
+        lctx.globalCompositeOperation = 'destination-out';
     } else {
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.strokeStyle = currentColor;
+        lctx.globalCompositeOperation = 'source-over';
+        lctx.strokeStyle = currentColor;
     }
 
-    ctx.lineWidth = currentSize;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    lctx.lineWidth = currentSize;
+    lctx.lineCap = 'round';
+    lctx.lineJoin = 'round';
 
-    ctx.beginPath();
-    ctx.moveTo(lastX, lastY);
-    ctx.lineTo(x, y);
-    ctx.stroke();
+    lctx.beginPath();
+    lctx.moveTo(lastX, lastY);
+    lctx.lineTo(x, y);
+    lctx.stroke();
 
     lastX = x;
     lastY = y;
+
+    renderAll();
 }
 
 function stopDrawing() {
@@ -166,24 +273,29 @@ function changeColor(e) {
 }
 
 function saveState() {
-    undoStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+    const layer = getActiveLayer();
+    undoStack.push(layer.ctx.getImageData(0, 0, canvas.width, canvas.height));
     redoStack = [];
     updateUndoRedoButtons();
 }
 
 function undo() {
     if (undoStack.length > 1) {
+        const layer = getActiveLayer();
         redoStack.push(undoStack.pop());
-        ctx.putImageData(undoStack[undoStack.length - 1], 0, 0);
+        layer.ctx.putImageData(undoStack[undoStack.length - 1], 0, 0);
+        renderAll();
         updateUndoRedoButtons();
     }
 }
 
 function redo() {
     if (redoStack.length > 0) {
+        const layer = getActiveLayer();
         const state = redoStack.pop();
         undoStack.push(state);
-        ctx.putImageData(state, 0, 0);
+        layer.ctx.putImageData(state, 0, 0);
+        renderAll();
         updateUndoRedoButtons();
     }
 }
@@ -193,39 +305,98 @@ function updateUndoRedoButtons() {
     document.getElementById('tool-redo').disabled = redoStack.length === 0;
 }
 
-function clearAll() {
+function clearActiveLayer() {
     const doClear = () => {
         saveState();
-        ctx.fillStyle = '#222';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const layer = getActiveLayer();
+        layer.ctx.clearRect(0, 0, canvas.width, canvas.height);
+        renderAll();
     };
 
     if (WebApp && WebApp.platform !== 'unknown') {
-        WebApp.showConfirm('Очистити все? Дію можна скасувати (Undo).', (isOk) => {
+        WebApp.showConfirm('Очистити активний шар?', (isOk) => {
             if (isOk) doClear();
         });
     } else {
-        if (confirm('Очистити все?')) doClear();
+        if (confirm('Очистити активний шар?')) doClear();
     }
 }
 
+function updateLayersUI() {
+    const container = document.getElementById('layers-list');
+    container.innerHTML = '';
+
+    layers.forEach((layer, i) => {
+        const item = document.createElement('div');
+        item.className = 'layer-item';
+        if (i === activeLayerIndex) item.classList.add('active');
+
+        const visibilityBtn = document.createElement('button');
+        visibilityBtn.className = 'layer-btn';
+        visibilityBtn.innerHTML = layer.visible ? '👁' : '👁‍🗨';
+        visibilityBtn.onclick = () => toggleLayerVisibility(i);
+
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = layer.name;
+        nameSpan.onclick = () => setActiveLayer(i);
+
+        const controls = document.createElement('div');
+        controls.className = 'layer-controls';
+
+        const upBtn = document.createElement('button');
+        upBtn.className = 'layer-btn';
+        upBtn.innerHTML = '↑';
+        upBtn.onclick = () => moveLayerUp(i);
+
+        const downBtn = document.createElement('button');
+        downBtn.className = 'layer-btn';
+        downBtn.innerHTML = '↓';
+        downBtn.onclick = () => moveLayerDown(i);
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'layer-btn';
+        delBtn.innerHTML = '×';
+        delBtn.onclick = () => deleteLayer(i);
+
+        controls.appendChild(upBtn);
+        controls.appendChild(downBtn);
+        if (layers.length > 1) controls.appendChild(delBtn);
+
+        item.appendChild(visibilityBtn);
+        item.appendChild(nameSpan);
+        item.appendChild(controls);
+        container.appendChild(item);
+    });
+}
+
 function saveArt() {
-    const dataUrl = canvas.toDataURL('image/png');
-    localStorage.setItem('morstrix_draw', dataUrl);
+    const saved = layers.map(layer => ({
+        dataUrl: layer.canvas.toDataURL('image/png'),
+        visible: layer.visible,
+        name: layer.name
+    }));
+    localStorage.setItem('morstrix_layers', JSON.stringify(saved));
 }
 
 function loadArt() {
-    const saved = localStorage.getItem('morstrix_draw');
+    const saved = localStorage.getItem('morstrix_layers');
     if (saved) {
-        const img = new Image();
-        img.onload = () => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#222';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            saveState();
-        };
-        img.src = saved;
+        const data = JSON.parse(saved);
+        layers = [];
+        data.forEach((item, i) => {
+            createLayer(item.name.replace(/\s\d+$/, ''));
+            const layer = layers[i];
+            layer.visible = item.visible;
+            const img = new Image();
+            img.onload = () => {
+                layer.ctx.drawImage(img, 0, 0);
+                if (i === data.length - 1) {
+                    setActiveLayer(0);
+                    renderAll();
+                }
+            };
+            img.src = item.dataUrl;
+        });
     } else {
         saveState();
     }
