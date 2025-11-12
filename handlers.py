@@ -7,6 +7,7 @@ import logging
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, ConversationHandler
 from telegram.constants import ParseMode
+from telegram.error import Forbidden
 from dotenv import load_dotenv
 
 from font_utils import convert_text_to_font
@@ -52,44 +53,54 @@ async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 # === 2. Автосхвалення заявки + ЛС (розбито на 3 повідомлення) + привітання в групі ===
 async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.chat.id
-    user_id = update.from_user.id
-    user_full_name = update.from_user.full_name
-    chat_title = update.chat.title or "групи"
-
     try:
+        # Виправлено: Використовуємо update.chat_join_request для точного доступу
+        join_request = update.chat_join_request
+        if not join_request:
+            logger.error("ChatJoinRequest не знайдено в update.")
+            return
+
+        chat_id = join_request.chat.id
+        user_id = join_request.from_user.id
+        user_full_name = join_request.from_user.full_name
+        chat_title = join_request.chat.title or "групи"  # Не використовується, але збережемо
+
         # 1. Схвалюємо заявку
         await context.bot.approve_chat_join_request(chat_id=chat_id, user_id=user_id)
         logger.info(f"Заявка {user_id} схвалена в {chat_id}")
 
-        # 2. ЛС користувачу — 3 окремі повідомлення
-        # Повідомлення 1
-        await context.bot.send_message(
-            user_id,
-            f"{user_full_name}! зᴀпит схвᴀʌᴇно.",
-            parse_mode=ParseMode.MARKDOWN
-        )
+        # 2. ЛС користувачу — 3 окремі повідомлення (з обробкою Forbidden)
+        try:
+            # Повідомлення 1
+            await context.bot.send_message(
+                user_id,
+                f"{user_full_name}! зᴀпит схвᴀʌᴇно.",
+                parse_mode=ParseMode.MARKDOWN
+            )
 
-        # Повідомлення 2
-        await context.bot.send_message(
-            user_id,
-            "шᴏ я ᴍᴏжу?\n\n"
-            "➞ ᴀʙᴛᴏпᴘийᴏᴍ зᴀяʙᴏᴋ\n"
-            "➞ ʙᴇʌᴋᴀᴍ з пᴘᴀʙиʌᴀᴍи\n"
-            "➞ пᴇᴘᴇʙіᴘᴋᴀ пᴏᴄиʌᴀнь\n"
-            "➞ /font - ᴛᴇᴋᴄᴛ ᴄᴛᴀйʌᴇᴘ\n"
-            "➞ ШІ — дʌя чʌᴇніʙ ᴋʌубу\n"
-            "(ʙ чᴀᴛᴀх: ᴛᴘигᴇᴘ ᴀʌᴏ)",
-            parse_mode=ParseMode.MARKDOWN
-        )
+            # Повідомлення 2
+            await context.bot.send_message(
+                user_id,
+                "шᴏ я ᴍᴏжу?\n\n"
+                "➞ ᴀʙᴛᴏпᴘийᴏᴍ зᴀяʙᴏᴋ\n"
+                "➞ ʙᴇʌᴋᴀᴍ з пᴘᴀʙиʌᴀᴍи\n"
+                "➞ пᴇᴘᴇʙіᴘᴋᴀ пᴏᴄиʌᴀнь\n"
+                "➞ /font - ᴛᴇᴋᴄᴛ ᴄᴛᴀйʌᴇᴘ\n"
+                "➞ ШІ — дʌя чʌᴇніʙ ᴋʌубу\n"
+                "(ʙ чᴀᴛᴀх: ᴛᴘигᴇᴘ ᴀʌᴏ)",
+                parse_mode=ParseMode.MARKDOWN
+            )
 
-        # Повідомлення 3
-        await context.bot.send_message(
-            user_id,
-            "➞ ᴘᴀɪɴᴛ ᴀᴘᴘ (ᴘʀᴏᴛᴏᴛʏᴘᴇ)\n"
-            "t.me/MORSTRIXBOT/paint",
-            parse_mode=ParseMode.MARKDOWN
-        )
+            # Повідомлення 3
+            await context.bot.send_message(
+                user_id,
+                "➞ ᴘᴀɪɴᴛ ᴀᴘᴘ (ᴘʀᴏᴛᴏᴛʏᴘᴇ)\n"
+                "t.me/MORSTRIXBOT/paint",
+                parse_mode=ParseMode.MARKDOWN
+            )
+        except Forbidden as e:
+            logger.warning(f"Не можу надіслати в ЛС користувачу {user_id}: {e}. Користувач не починав чат з ботом.")
+            # Опціонально: можна додати згадку в групі, але пропустимо, щоб не спамити
 
         # 3. Привітання в групі
         keyboard = [[InlineKeyboardButton("пᴘᴀʙиʌᴀ", callback_data="show_rules")]]
