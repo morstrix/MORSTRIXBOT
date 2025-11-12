@@ -7,7 +7,7 @@ import logging
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, ConversationHandler
 from telegram.constants import ParseMode
-from telegram.error import Forbidden, BadRequest
+from telegram.error import Forbidden, BadRequest, NetworkError
 from dotenv import load_dotenv
 
 from font_utils import convert_text_to_font
@@ -52,7 +52,7 @@ async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 # === 2. АВТОСХВАЛЕННЯ ЗАЯВКИ + ЛС (3 повідомлення) + ПРИВІТАННЯ ===
 async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # ✅ ДОДАНО: Лог на вхід для діагностики (чи приходить подія)
+    # ✅ ДОДАНО: Лог на вхід для діагностики (чи приходить подія з Telegram)
     logger.info("=== ВХІД У handle_join_request: подія chat_join_request ОТРИМАНА ===")
 
     # 1. Отримуємо об’єкт заявки
@@ -68,18 +68,18 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     logger.info(f"ЗАЯВКА: @{username} ({user_id}) → {join_req.chat.title} ({chat_id})")
 
-    # 2. СХВАЛЮЄМО (обов’язково першим)
+    # 2. СХВАЛЮЄМО (обов’язково першим) — ЗМІНЕНО: на явний виклик для стабільності
     try:
-        await join_req.approve()
+        await context.bot.approve_chat_join_request(chat_id=chat_id, user_id=user_id)
         logger.info(f"СХВАЛЕНО: {user_id}")
     except BadRequest as br:
-        logger.error(f"BadRequest при схваленні {user_id}: {br}")
+        logger.error(f"BadRequest при схваленні {user_id}: {br} — перевір права бота (can_invite_users)")
         return
     except Exception as exc:
         logger.error(f"Помилка схвалення {user_id}: {exc}")
         return
 
-    # 3. НАДСИЛАЄМО 3 ПОВІДОМЛЕННЯ В ЛС
+    # 3. НАДСИЛАЄМО 3 ПОВІДОМЛЕННЯ В ЛС — ДОДАНО: обробку NetworkError
     try:
         await context.bot.send_message(
             user_id,
@@ -106,17 +106,22 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
         logger.info(f"ЛС надіслано {user_id}")
     except Forbidden:
         logger.warning(f"ЛС заблоковано для {user_id} (користувач не писав боту)")
+    except NetworkError as ne:
+        logger.error(f"NetworkError при ЛС {user_id}: {ne} — перевір інтернет/таймаут")
 
-    # 4. ПРИВІТАННЯ В ГРУПІ
-    keyboard = [[InlineKeyboardButton("пᴘᴀʙиʌᴀ", callback_data="show_rules")]]
-    markup   = InlineKeyboardMarkup(keyboard)
+    # 4. ПРИВІТАННЯ В ГРУПІ — ДОДАНО: обробку NetworkError
+    try:
+        keyboard = [[InlineKeyboardButton("пᴘᴀʙиʌᴀ", callback_data="show_rules")]]
+        markup   = InlineKeyboardMarkup(keyboard)
 
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text=f"ᴀйо {full_name}!\nᴏзнᴀйᴏᴍᴛᴇᴄя з пᴘᴀʙиʌᴀᴍи.",
-        reply_markup=markup
-    )
-    logger.info(f"Привітання в групі {chat_id}")
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=f"ᴀйо {full_name}!\nᴏзнᴀйᴏᴍᴛᴇᴄя з пᴘᴀʙиʌᴀᴍи.",
+            reply_markup=markup
+        )
+        logger.info(f"Привітання в групі {chat_id}")
+    except NetworkError as ne:
+        logger.error(f"NetworkError при привітанні {chat_id}: {ne} — перевір інтернет")
 
 
 # === 3. Привітання при вступі (резерв) ===
