@@ -52,7 +52,7 @@ async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 # === 2. АВТОСХВАЛЕННЯ ЗАЯВКИ + ЛС (3 повідомлення) + ПРИВІТАННЯ ===
 async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # ✅ ДОДАНО: Лог на вхід для діагностики (чи приходить подія з Telegram)
+    # ✅ Лог на вхід для діагностики (чи приходить подія з Telegram)
     logger.info("=== ВХІД У handle_join_request: подія chat_join_request ОТРИМАНА ===")
 
     # 1. Отримуємо об’єкт заявки
@@ -63,10 +63,11 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     chat_id   = join_req.chat.id
     user_id   = join_req.from_user.id
+    user_chat_id = join_req.user_chat_id  # ✅ ДОДАНО: для ЛС (Bot API 6.5+)
     full_name = join_req.from_user.full_name
     username  = join_req.from_user.username or "без username"
 
-    logger.info(f"ЗАЯВКА: @{username} ({user_id}) → {join_req.chat.title} ({chat_id})")
+    logger.info(f"ЗАЯВКА: @{username} ({user_id}) → {join_req.chat.title} ({chat_id}) | user_chat_id: {user_chat_id}")
 
     # 2. СХВАЛЮЄМО (обов’язково першим) — ЗМІНЕНО: на явний виклик для стабільності
     try:
@@ -79,15 +80,16 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
         logger.error(f"Помилка схвалення {user_id}: {exc}")
         return
 
-    # 3. НАДСИЛАЄМО 3 ПОВІДОМЛЕННЯ В ЛС — ДОДАНО: обробку NetworkError
+    # 3. НАДСИЛАЄМО 3 ПОВІДОМЛЕННЯ В ЛС — ✅ ДОДАНО: user_chat_id для ЛС
     try:
+        lс_chat_id = user_chat_id or user_id  # Використовуємо user_chat_id, якщо є
         await context.bot.send_message(
-            user_id,
+            lс_chat_id,
             f"{full_name}! зᴀпит схвᴀʌᴇно.",
             parse_mode=ParseMode.MARKDOWN
         )
         await context.bot.send_message(
-            user_id,
+            lс_chat_id,
             "шᴏ я ᴍᴏжу?\n\n"
             "➞ ᴀʙᴛᴏᴘᴘийᴏᴍ зᴀяʙᴏᴋ\n"
             "➞ ʙᴇʌᴋᴀᴍ з пᴘᴀʙиʌᴀᴍи\n"
@@ -98,12 +100,12 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
             parse_mode=ParseMode.MARKDOWN
         )
         await context.bot.send_message(
-            user_id,
+            lс_chat_id,
             "➞ ᴘᴀɪɴᴛ ᴀᴘᴘ (ᴘʀᴏᴛᴏᴛʏᴘᴇ)\n"
             "t.me/MORSTRIXBOT/paint",
             parse_mode=ParseMode.MARKDOWN
         )
-        logger.info(f"ЛС надіслано {user_id}")
+        logger.info(f"ЛС надіслано {lс_chat_id}")
     except Forbidden:
         logger.warning(f"ЛС заблоковано для {user_id} (користувач не писав боту)")
     except NetworkError as ne:
@@ -112,12 +114,12 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
     # 4. ПРИВІТАННЯ В ГРУПІ — ДОДАНО: обробку NetworkError
     try:
         keyboard = [[InlineKeyboardButton("пᴘᴀʙиʌᴀ", callback_data="show_rules")]]
-        markup   = InlineKeyboardMarkup(keyboard)
+        reply_markup = InlineKeyboardMarkup(keyboard)
 
         await context.bot.send_message(
             chat_id=chat_id,
             text=f"ᴀйо {full_name}!\nᴏзнᴀйᴏᴍᴛᴇᴄя з пᴘᴀʙиʌᴀᴍи.",
-            reply_markup=markup
+            reply_markup=reply_markup
         )
         logger.info(f"Привітання в групі {chat_id}")
     except NetworkError as ne:
@@ -132,6 +134,7 @@ async def handle_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             welcome = f"ᴀйо {member.full_name}!\nᴏзнᴀйᴏᴍᴛᴇᴄя з пᴘᴀʙиʌᴀᴍи."
+
             thread_id = update.message.message_thread_id if update.message.is_topic_message else None
             await update.message.reply_text(welcome, reply_markup=reply_markup, message_thread_id=thread_id)
 
@@ -140,6 +143,7 @@ async def handle_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+
     if query.data == "show_rules":
         rules = "ᴋᴏᴘиᴄᴛуйᴄя ᴛᴘигᴇᴘᴏᴍ ᴀʌᴏ"
         try:
@@ -166,8 +170,10 @@ async def font_get_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         await update.message.reply_text("Порожньо. Введіть текст або /cancel.")
         return FONT_TEXT
 
+    # Тепер convert_text_to_font повертає готовий блок \`\`\`текст\`\`\`
     converted_block = convert_text_to_font(user_text)
 
+    # Видаляємо старі повідомлення
     for key in ['font_command_id', 'font_bot_request_id']:
         try:
             await context.bot.delete_message(chat_id=chat_id, message_id=context.user_data.get(key))
@@ -176,10 +182,11 @@ async def font_get_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         await context.bot.delete_message(chat_id=chat_id, message_id=update.message.message_id)
     except: pass
 
+    # Надсилаємо блок коду — з’явиться кнопка «Копіювати»
     await context.bot.send_message(
         chat_id=chat_id,
         text=converted_block,
-        parse_mode=ParseMode.MARKDOWN_V2,
+        parse_mode=ParseMode.MARKDOWN_V2,   # ← обов’язково V2
         message_thread_id=update.message.message_thread_id
     )
     return ConversationHandler.END
