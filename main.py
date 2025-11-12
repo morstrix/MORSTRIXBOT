@@ -57,7 +57,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "➞ пᴇᴘᴇʙіᴘᴋᴀ пᴏᴄиʌᴀнь\n"
         "➞ /font - ᴛᴇᴋᴄᴛ ᴄᴛᴀйʌᴇᴘ\n\n"
         "➞ ШІ — дʌя чʌᴇніʙ ᴋʌубу (ᴀʌᴏ)\n"
-        "➞ DRAFTZ — у меню (Main App)",
+        "➞ ᴘᴀɪɴᴛ ᴀᴘᴘ (ᴘʀᴏᴛᴏᴛʏᴘᴇ)",
         reply_markup=reply_markup,
         parse_mode=ParseMode.MARKDOWN
     )
