@@ -48,7 +48,7 @@ async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE
             logger.error(f"ART error: {e}")
 
 
-# === 2. Автосхвалення заявки + ЛС + привітання в групі ===
+# === 2. Автосхвалення заявки + ЛС (розбито на 3 повідомлення) + привітання в групі ===
 async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.chat.id
     user_id = update.from_user.id
@@ -60,11 +60,32 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
         await context.bot.approve_chat_join_request(chat_id=chat_id, user_id=user_id)
         logger.info(f"Заявка {user_id} схвалена в {chat_id}")
 
-        # 2. ЛС користувачу
+        # 2. ЛС користувачу — 3 окремі повідомлення
+        # Повідомлення 1
         await context.bot.send_message(
             user_id,
-            f"✅ {user_full_name}! Ваш запит до *{chat_title}* схвалено.\n"
-            f"Ласкаво просимо до ☇ ꜰ ☻‌ ʀ ᴜ ʍ❓",
+            f"✅ {user_full_name}! зᴀпит схвᴀʌᴇно.",
+            parse_mode=ParseMode.MARKDOWN
+        )
+
+        # Повідомлення 2
+        await context.bot.send_message(
+            user_id,
+            "шᴏ я ᴍᴏжу?\n\n"
+            "➞ ᴀʙᴛᴏпᴘийᴏᴍ зᴀяʙᴏᴋ\n"
+            "➞ ʙᴇʌᴋᴀᴍ з пᴘᴀʙиʌᴀᴍи\n"
+            "➞ пᴇᴘᴇʙіᴘᴋᴀ пᴏᴄиʌᴀнь\n"
+            "➞ /font - ᴛᴇᴋᴄᴛ ᴄᴛᴀйʌᴇᴘ\n"
+            "➞ ШІ — дʌя чʌᴇніʙ ᴋʌубу\n"
+            "(ʙ чᴀᴛᴀх: ᴛᴘигᴇᴘ ᴀʌᴏ)",
+            parse_mode=ParseMode.MARKDOWN
+        )
+
+        # Повідомлення 3
+        await context.bot.send_message(
+            user_id,
+            "➞ ᴘᴀɪɴᴛ ᴀᴘᴘ (ᴘʀᴏᴛᴏᴛʏᴘᴇ)\n"
+            "t.me/MORSTRIXBOT/paint",
             parse_mode=ParseMode.MARKDOWN
         )
 
