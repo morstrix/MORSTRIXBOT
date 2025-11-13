@@ -26,6 +26,9 @@ else:
 if not TELEGRAM_CHAT_ID:
     print("Ошибка: TELEGRAM_CHAT_ID не найден в .env файле. Проверка подписки для личных сообщений не будет работать.")
 
+# ✅ НОВЕ: Строкове представлення ID для коректного порівняння
+TELEGRAM_CHAT_ID_STR = str(TELEGRAM_CHAT_ID) if TELEGRAM_CHAT_ID else None
+
 last_request_time = 0
 MIN_DELAY_SECONDS = 60
 
@@ -119,7 +122,18 @@ async def handle_gemini_message_group(update: Update, context: ContextTypes.DEFA
     """
     Обрабатывает сообщения в групповом чате, содержащие слово "ало" (только текст).
     """
-    if not await _check_and_reply_subscription(update, context):
+    if not update.message: 
+        return
+
+    current_chat_id_str = str(update.effective_chat.id)
+    
+    # ✅ НОВЕ: Пропускаємо перевірку підписки, якщо повідомлення прийшло з цільового чату.
+    if TELEGRAM_CHAT_ID_STR and current_chat_id_str == TELEGRAM_CHAT_ID_STR:
+        is_subscribed = True
+    else:
+        is_subscribed = await _check_and_reply_subscription(update, context)
+
+    if not is_subscribed:
         return
 
     if not update.message.text:
@@ -140,7 +154,8 @@ async def handle_gemini_message_private(update: Update, context: ContextTypes.DE
     """
     Обрабатывает любое сообщение в личном чате с ботом (только текст).
     """
-    # УДАЛЕНО: if context.user_data.get('state') == 'support': return
+    if not update.message:
+        return
 
     user_text = update.message.text
     
