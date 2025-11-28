@@ -87,15 +87,18 @@ def setup_handlers(app: Application):
 # HTTP-сервер (для Render)
 # ========================================
 async def health_check(request):
+    """Ендпоінт для перевірки здоров'я бота (Health Check)"""
     return web.Response(text="MORSTRIX BOT IS ALIVE", status=200)
 
 async def start_http_server():
+    """Запуск легкого HTTP-сервера для запобігання 'засинанню' на Render."""
     app = web.Application()
     app.router.add_get('/', health_check)
     app.router.add_get('/health', health_check)
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', PORT)
+    # Bind to 0.0.0.0 is crucial for Render
+    site = web.TCPSite(runner, '0.0.0.0', PORT) 
     await site.start()
     logger.info(f"HTTP-сервер запущено на порту {PORT}")
 
@@ -115,7 +118,7 @@ def main():
         setup_handlers(app)
         
         app.run_polling(
-            # drop_pending_updates=False,  <-- ВИДАЛЕНО, за замовчуванням True, що краще
+            # drop_pending_updates за замовчуванням True, що ідеально
             allowed_updates=[
                 "message", "callback_query", "chat_join_request",
                 "my_chat_member", "chat_member", "web_app_data"
@@ -125,7 +128,7 @@ def main():
         logger.info("=== LOCAL: POLLING ===")
         app = Application.builder().token(TOKEN).build()
         setup_handlers(app)
-        app.run_polling() # drop_pending_updates=False теж видалено
+        app.run_polling()
         
 if __name__ == "__main__":
     main()
