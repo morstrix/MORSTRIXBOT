@@ -6,6 +6,7 @@ from telegram.ext import ContextTypes
 from dotenv import load_dotenv
 import google.generativeai as genai
 from google.api_core.exceptions import GoogleAPICallError 
+# from langdetect import detect # Удалено, так как язык теперь фиксирован
 
 load_dotenv()
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
@@ -17,6 +18,14 @@ TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 MODEL_NAME = "gemini-2.5-flash" 
 FORUM_INVITE_LINK = "https://t.me/+7Xmj6pPB0mEyMDky" 
 FORUM_BUTTON_TEXT = "☇ ꜰ ☻‌ ʀ ᴜ ʍ❓" 
+
+# ✅ ОНОВЛЕНО: ЄДИНА ІНСТРУКЦІЯ, ЩО ВКЛЮЧАЄ ВСІ ВИМОГИ
+GEMINI_SYSTEM_INSTRUCTION = (
+    "Ты — бот-помощник. Отвечай максимально кратким, прямым, конструктивным и грамотным украинским языком. "
+    "Избегай подробных объяснений и длинных абзацев. Каждый твой ответ должен содержать несколько эмодзи, соответствующих контексту. "
+    "КАТЕГОРИЧЕСКИ запрещено использовать символы Markdown, такие как звездочки (*), для выделения жирным или курсивом, "
+    "а также другие форматирующие символы. Отвечай дерзко или с сарказмом, со сленгом, как зумер."
+)
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
@@ -30,12 +39,11 @@ if not TELEGRAM_CHAT_ID:
 TELEGRAM_CHAT_ID_STR = str(TELEGRAM_CHAT_ID) if TELEGRAM_CHAT_ID else None
 
 last_request_time = 0
-MIN_DELAY_SECONDS = 60
+MIN_DELAY_SECONDS = 60 # Используем вашу константу
 
-SYSTEM_PROMPT = (
-    "Ты — бот-помощник, который отвечает коротко, конструктивно и грамотным украинским языком. "
-    "Каждый твой ответ должен содержать эмодзи, соответствующий контексту и быть максимально полезным. "
-)
+# =========================================================================
+# ФУНКЦІЇ GEMINI
+# =========================================================================
 
 async def _get_gemini_response(user_text):
     """
@@ -46,20 +54,28 @@ async def _get_gemini_response(user_text):
     current_time = time.time()
     if current_time - last_request_time < MIN_DELAY_SECONDS:
         remaining_time = int(MIN_DELAY_SECONDS - (current_time - last_request_time))
-        return f"почекай трохи 🫩 відпочину {remaining_time}"
+        # ✅ Ответ на украинском с эмодзи
+        return f"почекай трохи 🫩 відпочину {remaining_time} секунд."
 
     if not GEMINI_API_KEY:
         print("API ключ не настроен. Невозможно получить ответ.")
+        # ✅ Ответ на украинском с эмодзи
         return "у мене немає api ключа 🔑"
 
+    last_request_time = current_time
+
     try:
-        model = genai.GenerativeModel(MODEL_NAME, system_instruction=SYSTEM_PROMPT) 
+        client = genai.Client()
         
-        response = model.generate_content(
-            user_text
+        # ✅ ИСПОЛЬЗУЕМ GenerateContentConfig ДЛЯ СИСТЕМНОЙ ИНСТРУКЦИИ
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=[user_text],
+            config=genai.types.GenerateContentConfig(
+                system_instruction=GEMINI_SYSTEM_INSTRUCTION
+            )
         )
 
-        last_request_time = current_time
         return response.text
 
     except GoogleAPICallError as e:
@@ -78,6 +94,10 @@ async def _get_gemini_response(user_text):
         print(f"Неизвестная ошибка: {e}")
         return "щось зламалось 💔"
 
+
+# =========================================================================
+# ФУНКЦІЇ ПЕРЕВІРКИ ПІДПИСКИ ТА ХЕНДЛЕРИ (Без змін)
+# =========================================================================
 
 async def _check_and_reply_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """
@@ -105,6 +125,7 @@ async def _check_and_reply_subscription(update: Update, context: ContextTypes.DE
         ]
 
         if not is_member:
+            # ✅ Ответ на украинском 
             await update.message.reply_text(
                 "тільки для членів клубу",
                 reply_markup=reply_markup
@@ -113,6 +134,7 @@ async def _check_and_reply_subscription(update: Update, context: ContextTypes.DE
     except Exception as e:
         # Эта ветка обрабатывает ошибки, связанные с неправильным ID чата или правами бота.
         print(f"Помилка перевірки підписки для користувача {user_id}: {e}")
+        # ✅ Ответ на украинском 
         await update.message.reply_text("не можу перевірити підписку") 
         return False
     
