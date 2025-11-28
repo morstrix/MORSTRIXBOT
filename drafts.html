@@ -7,10 +7,11 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
-            --bg: #111;
+            --bg: #000; /* Чорний фон */
             --border: #444;
             --text: #fff;
-            --grid: #222;
+            --grid: #111; /* Темніша сітка */
+            --piece-color: #00ff00; /* Зелений колір фігур */
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body {
@@ -20,36 +21,32 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: flex-start;
+            justify-content: center; /* Центруємо по вертикалі, якщо є місце */
             min-height: 100vh;
-            overflow: hidden;
-        }
-        #game-info {
-            font-size: 1.2em;
-            padding: 10px;
-            display: flex;
-            justify-content: space-around;
-            width: 90%;
-            max-width: 300px;
+            overflow: hidden; /* Прибираємо прокрутку */
         }
         #tetris-canvas {
             border: 2px solid var(--border);
             background: var(--grid);
             display: block;
-            margin-bottom: 20px;
+            /* Автоматично розраховуємо розмір на основі viewport */
+            max-width: 90vw; /* Максимальна ширина 90% від ширини екрану */
+            max-height: calc(100vh - 80px); /* Максимальна висота, враховуючи контролери */
+            width: auto; /* Дозволяємо ширині адаптуватися */
+            height: auto; /* Дозволяємо висоті адаптуватися */
         }
         .controls {
             position: fixed;
             bottom: 0;
             width: 100%;
             padding: 10px 0;
-            background: rgba(17, 17, 17, 0.9);
+            background: rgba(0, 0, 0, 0.8); /* Напівпрозорий чорний фон для контролерів */
             display: flex;
             justify-content: center;
-            gap: 20px;
+            gap: 10px; /* Зменшуємо проміжок */
         }
         .ctrl-btn {
-            padding: 15px 25px;
+            padding: 15px 20px; /* Зменшуємо паддінги */
             font-size: 1.5em;
             background: #333;
             color: #fff;
@@ -58,22 +55,17 @@
             cursor: pointer;
             user-select: none;
             flex-grow: 1;
-            max-width: 100px;
+            max-width: 80px; /* Зменшуємо максимальну ширину кнопки */
         }
         #rotate-btn {
-            background: #008000;
+            background: #008000; /* Зелена кнопка обертання */
         }
         #down-btn {
-            background: #800000;
+            background: #800000; /* Червона кнопка вниз */
         }
     </style>
 </head>
 <body>
-
-<div id="game-info">
-    <span>Рахунок: <span id="score">0</span></span>
-    <span>Рівень: <span id="level">1</span></span>
-</div>
 
 <canvas id="tetris-canvas"></canvas>
 
