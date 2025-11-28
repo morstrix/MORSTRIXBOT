@@ -1,6 +1,5 @@
 import os
 import time
-# ✅ Видалено ChatMember, залишено Chat
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Chat
 from telegram.ext import ContextTypes
 from dotenv import load_dotenv
@@ -26,13 +25,12 @@ else:
 if not TELEGRAM_CHAT_ID:
     print("Ошибка: TELEGRAM_CHAT_ID не найден в .env файле. Проверка подписки для личных сообщений не будет работать.")
 
-# ✅ НОВЕ: Строкове представлення ID для коректного порівняння
 TELEGRAM_CHAT_ID_STR = str(TELEGRAM_CHAT_ID) if TELEGRAM_CHAT_ID else None
 
 last_request_time = 0
 MIN_DELAY_SECONDS = 60
 
-# ✅ ИСПРАВЛЕННЫЙ PROMPT: Добавлен запрет на Markdown
+# Налаштування стилю відповіді (ваші вимоги)
 SYSTEM_PROMPT = (
     "Ты — бот-помощник. Отвечай максимально кратким, прямым, конструктивным и **грамотным украинским языком**. "
     "Избегай подробных объяснений и длинных абзацев. **Каждый твой ответ должен содержать один эмодзи**, соответствующий контексту. "
@@ -56,18 +54,18 @@ async def _get_gemini_response(user_text):
         return "у мене немає api ключа 🔑"
 
     try:
-        # ✅ ИСПРАВЛЕНО: Использование genai.Client() и config для system_instruction
-        client = genai.Client()
+        # ✅ КЛЮЧОВЕ ВИПРАВЛЕННЯ: Створення об'єкта моделі, що включає системний промпт
+        # Цей метод більш стійкий до асинхронних збоїв.
+        model = genai.GenerativeModel(
+            model_name=MODEL_NAME,
+            system_instruction=SYSTEM_PROMPT
+        )
         
-        response = client.models.generate_content(
-            model=MODEL_NAME,
-            contents=[user_text],
-            config=genai.types.GenerateContentConfig(
-                system_instruction=SYSTEM_PROMPT
-            )
+        response = model.generate_content(
+            contents=[user_text] # Просто передаємо текст
         )
 
-        last_request_time = time.time() # Обновляем время только после успешного ответа
+        last_request_time = time.time() 
         return response.text
 
     except GoogleAPICallError as e:
@@ -83,10 +81,10 @@ async def _get_gemini_response(user_text):
             return f"не можу відповісти 🤯: {error_message[:50]}..." 
 
     except Exception as e:
-        print(f"Неизвестная ошибка: {e}")
-        # Это сообщение возникает, если проблема не в API, а в самом коде Python.
-        # Например, если произошел сбой при создании объекта GenerativeModel.
-        return "щось зламалось 💔"
+        # Цей блок ловить помилки, які не пов'язані з API (наприклад, проблеми Python на сервері).
+        print(f"Неизвестная ошибка Python/SDK: {e}")
+        # Змінюємо повідомлення на більш інформативне, але зберігаємо тон.
+        return "щось зламалось. перевір логи на Render 🛠️"
 
 
 async def _check_and_reply_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -133,7 +131,6 @@ async def handle_gemini_message_group(update: Update, context: ContextTypes.DEFA
 
     current_chat_id_str = str(update.effective_chat.id)
     
-    # ✅ НОВЕ: Пропускаємо перевірку підписки, якщо повідомлення прийшло з цільового чату.
     if TELEGRAM_CHAT_ID_STR and current_chat_id_str == TELEGRAM_CHAT_ID_STR:
         is_subscribed = True
     else:
