@@ -115,7 +115,7 @@ def main():
         setup_handlers(app)
         
         app.run_polling(
-            drop_pending_updates=False,  # ✅ ВИДАЛЕНО: тепер allowed_updates працюють
+            # drop_pending_updates=False,  <-- ВИДАЛЕНО, за замовчуванням True, що краще
             allowed_updates=[
                 "message", "callback_query", "chat_join_request",
                 "my_chat_member", "chat_member", "web_app_data"
@@ -125,7 +125,7 @@ def main():
         logger.info("=== LOCAL: POLLING ===")
         app = Application.builder().token(TOKEN).build()
         setup_handlers(app)
-        app.run_polling(drop_pending_updates=False)  # ✅ Теж видалено
-
+        app.run_polling() # drop_pending_updates=False теж видалено
+        
 if __name__ == "__main__":
     main()
