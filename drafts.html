@@ -12,41 +12,52 @@
             --text: #fff;
             --grid: #111; /* Темніша сітка */
             --piece-color: #00ff00; /* Зелений колір фігур */
+            --controls-height: 80px; /* Приблизна висота панелі керування */
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body {
+            touch-action: none;
+            overscroll-behavior: none;
+            -webkit-user-select: none;
+            user-select: none;
             background: var(--bg);
             color: var(--text);
             font-family: system-ui, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center; /* Центруємо по вертикалі, якщо є місце */
+            justify-content: flex-start; /* Вирівнювання на початок, щоб поле було зверху */
             min-height: 100vh;
-            overflow: hidden; /* Прибираємо прокрутку */
+            overflow: hidden; 
         }
         #tetris-canvas {
             border: 2px solid var(--border);
             background: var(--grid);
             display: block;
-            /* Автоматично розраховуємо розмір на основі viewport */
-            max-width: 90vw; /* Максимальна ширина 90% від ширини екрану */
-            max-height: calc(100vh - 80px); /* Максимальна висота, враховуючи контролери */
-            width: auto; /* Дозволяємо ширині адаптуватися */
-            height: auto; /* Дозволяємо висоті адаптуватися */
+            margin-top: 5px; /* Невеликий відступ зверху */
+            /* НОВЕ: Відступ знизу, який дорівнює висоті контролерів */
+            margin-bottom: var(--controls-height); 
+            
+            /* Динамічний розмір (буде уточнено в JS) */
+            max-width: 90vw; 
+            max-height: calc(100vh - var(--controls-height) - 10px); 
+            width: auto; 
+            height: auto; 
         }
         .controls {
             position: fixed;
             bottom: 0;
             width: 100%;
             padding: 10px 0;
-            background: rgba(0, 0, 0, 0.8); /* Напівпрозорий чорний фон для контролерів */
+            height: var(--controls-height); /* Фіксована висота */
+            background: rgba(0, 0, 0, 0.8); 
             display: flex;
             justify-content: center;
-            gap: 10px; /* Зменшуємо проміжок */
+            align-items: center;
+            gap: 10px; 
         }
         .ctrl-btn {
-            padding: 15px 20px; /* Зменшуємо паддінги */
+            padding: 15px 20px; 
             font-size: 1.5em;
             background: #333;
             color: #fff;
@@ -55,13 +66,13 @@
             cursor: pointer;
             user-select: none;
             flex-grow: 1;
-            max-width: 80px; /* Зменшуємо максимальну ширину кнопки */
+            max-width: 80px; 
         }
         #rotate-btn {
-            background: #008000; /* Зелена кнопка обертання */
+            background: #008000; 
         }
         #down-btn {
-            background: #800000; /* Червона кнопка вниз */
+            background: #800000; 
         }
     </style>
 </head>
