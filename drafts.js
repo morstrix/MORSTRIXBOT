@@ -1,419 +1,233 @@
 const WebApp = window.Telegram.WebApp;
 
-// === КОНФІГ ===
-const BRUSH_SIZES = [4, 8, 12, 16, 24];
-const ERASER_SIZES = [12, 20, 30, 40, 60];
-const DEFAULT_BRUSH = 8;
-const DEFAULT_ERASER = 20;
-const MAX_LAYERS = 5;
+// === КОНФІГ ГРИ ===
+const COLS = 10;
+const ROWS = 20;
+const BLOCK_SIZE = 15; // Розмір блоку в пікселях
+const INITIAL_DROP_SPEED = 1000; // Падіння раз на 1000 мс (1 секунда)
 
-// === СТАН ===
+// === СТАН ГРИ ===
 let canvas, ctx;
-let layers = [];
-let activeLayerIndex = 0;
-let isDrawing = false;
-let currentColor = '#ffffff';
-let currentTool = 'pen';
-let currentSize = DEFAULT_BRUSH;
-let lastX = 0, lastY = 0;
-let undoStack = [];
-let redoStack = [];
-let layersPanelVisible = true; // ← НОВЕ: стан панелі
+let board = [];
+let currentPiece;
+let score = 0;
+let level = 1;
+let dropCounter = 0;
+let dropInterval = INITIAL_DROP_SPEED;
+let lastTime = 0;
+let isGameOver = false;
+
+// === ФІГУРИ TETRIS (ТІЛЬКИ МІНІМАЛЬНИЙ НАБІР) ===
+const PIECES = [
+    { matrix: [[1, 1], [1, 1]], color: 'yellow' }, // O-форма
+    { matrix: [[0, 1, 0], [1, 1, 1], [0, 0, 0]], color: 'purple' }, // T-форма
+    { matrix: [[1, 1, 1, 1]], color: 'cyan' } // I-форма
+];
 
 // === ІНІЦІАЛІЗАЦІЯ ===
 function init() {
-    canvas = document.getElementById('paint-canvas');
+    canvas = document.getElementById('tetris-canvas');
     ctx = canvas.getContext('2d');
-    resizeCanvas();
+    
+    // Встановлення розміру канвасу
+    canvas.width = COLS * BLOCK_SIZE;
+    canvas.height = ROWS * BLOCK_SIZE;
 
-    createLayer('Фон');
-    setActiveLayer(0);
-
-    loadArt();
+    // Створення порожнього ігрового поля
+    for (let y = 0; y < ROWS; y++) {
+        board[y] = [];
+        for (let x = 0; x < COLS; x++) {
+            board[y][x] = 0; // 0 означає порожнє місце
+        }
+    }
+    
     setupEvents();
-    updateSizeDisplay();
-    updateLayersUI();
-    updateLayersPanelVisibility();
-
+    spawnPiece();
+    
     if (WebApp) {
         WebApp.ready();
         WebApp.expand();
         WebApp.BackButton.show();
     }
+
+    // Запуск ігрового циклу
+    gameLoop();
 }
 
-function resizeCanvas() {
-    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
-    ctx.putImageData(imgData, 0, 0);
+// === ІГРОВИЙ ЦИКЛ ===
+function gameLoop(time = 0) {
+    if (isGameOver) return;
 
-    layers.forEach(layer => {
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = layer.canvas.width;
-        tempCanvas.height = layer.canvas.height;
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.drawImage(layer.canvas, 0, 0);
-        layer.canvas.width = canvas.width;
-        layer.canvas.height = canvas.height;
-        layer.ctx = layer.canvas.getContext('2d');
-        layer.ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
-    });
-}
+    const deltaTime = time - lastTime;
+    lastTime = time;
 
-function createLayer(name = 'Шар') {
-    if (layers.length >= MAX_LAYERS) return;
-
-    const layerCanvas = document.createElement('canvas');
-    layerCanvas.width = canvas.width;
-    layerCanvas.height = canvas.height;
-    const layerCtx = layerCanvas.getContext('2d');
-
-    if (layers.length === 0) {
-        layerCtx.fillStyle = '#222';
-        layerCtx.fillRect(0, 0, layerCanvas.width, layerCanvas.height);
+    dropCounter += deltaTime;
+    if (dropCounter > dropInterval) {
+        dropPiece();
     }
 
-    layers.push({
-        canvas: layerCanvas,
-        ctx: layerCtx,
-        visible: true,
-        name: `${name} ${layers.length + 1}`
-    });
-
-    updateLayersUI();
-    renderAll();
+    draw();
+    requestAnimationFrame(gameLoop);
 }
 
-function setActiveLayer(index) {
-    if (index < 0 || index >= layers.length) return;
-    activeLayerIndex = index;
-    updateLayersUI();
-}
-
-function toggleLayerVisibility(index) {
-    if (index >= 0 && index < layers.length) {
-        layers[index].visible = !layers[index].visible;
-        updateLayersUI();
-        renderAll();
-    }
-}
-
-function deleteLayer(index) {
-    if (layers.length <= 1 || index < 0 || index >= layers.length) return;
-    layers.splice(index, 1);
-    if (activeLayerIndex >= layers.length) {
-        activeLayerIndex = layers.length - 1;
-    }
-    updateLayersUI();
-    renderAll();
-}
-
-function moveLayerUp(index) {
-    if (index < layers.length - 1) {
-        [layers[index], layers[index + 1]] = [layers[index + 1], layers[index]];
-        if (activeLayerIndex === index) activeLayerIndex++;
-        else if (activeLayerIndex === index + 1) activeLayerIndex--;
-        updateLayersUI();
-        renderAll();
-    }
-}
-
-function moveLayerDown(index) {
-    if (index > 0) {
-        [layers[index], layers[index - 1]] = [layers[index - 1], layers[index]];
-        if (activeLayerIndex === index) activeLayerIndex--;
-        else if (activeLayerIndex === index - 1) activeLayerIndex++;
-        updateLayersUI();
-        renderAll();
-    }
-}
-
-function getActiveLayer() {
-    return layers[activeLayerIndex];
-}
-
-function renderAll() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    layers.forEach(layer => {
-        if (layer.visible) {
-            ctx.drawImage(layer.canvas, 0, 0);
-        }
-    });
-}
-
-// === ПОДІЇ ===
-function setupEvents() {
-    document.getElementById('tool-pen').onclick = () => setTool('pen');
-    document.getElementById('tool-eraser').onclick = () => setTool('eraser');
-    document.getElementById('tool-clear').onclick = clearActiveLayer;
-    document.getElementById('tool-undo').onclick = undo;
-    document.getElementById('tool-redo').onclick = redo;
-    document.getElementById('color-picker').addEventListener('input', changeColor);
-    document.getElementById('size-minus').onclick = () => changeSize(-1);
-    document.getElementById('size-plus').onclick = () => changeSize(1);
-    document.getElementById('add-layer').onclick = () => createLayer();
-    document.getElementById('toggle-layers').onclick = toggleLayersPanel; // ← НОВЕ
-
-    canvas.addEventListener('pointerdown', startDrawing);
-    canvas.addEventListener('pointermove', draw);
-    canvas.addEventListener('pointerup', stopDrawing);
-    canvas.addEventListener('pointerleave', stopDrawing);
-
-    window.addEventListener('resize', () => {
-        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        resizeCanvas();
-        ctx.putImageData(imgData, 0, 0);
-        renderAll();
-    });
-
-    document.body.style.touchAction = 'none';
-    canvas.style.touchAction = 'none';
-
-    if (WebApp) {
-        WebApp.onEvent('backButtonClicked', sendArtAndClose);
-    }
-
-    window.addEventListener('beforeunload', () => {
-        if (WebApp && !WebApp.isClosing) {
-            sendArtAndClose();
-        }
-    });
-}
-
-function toggleLayersPanel() {
-    layersPanelVisible = !layersPanelVisible;
-    updateLayersPanelVisibility();
-}
-
-function updateLayersPanelVisibility() {
-    const panel = document.querySelector('.layers-panel');
-    const toggleBtn = document.getElementById('toggle-layers');
-    if (layersPanelVisible) {
-        panel.style.transform = 'translateX(0)';
-        toggleBtn.innerHTML = '◀';
-    } else {
-        panel.style.transform = 'translateX(100%)';
-        toggleBtn.innerHTML = '▶';
-    }
-}
-
-function sendArtAndClose() {
-    saveArt();
-    renderAll();
-    const dataUrl = canvas.toDataURL('image/png');
-    const payload = dataUrl.split(',')[1];
-    const data = `ART|morstrix_art_${Date.now()}|${payload}`;
-    WebApp.sendData(data);
-    WebApp.close();
-}
-
-function setTool(tool) {
-    currentTool = tool;
-    document.querySelectorAll('#tool-pen,#tool-eraser').forEach(b => b.classList.remove('active'));
-    document.getElementById('tool-' + tool).classList.add('active');
-    currentSize = currentTool === 'pen' ? DEFAULT_BRUSH : DEFAULT_ERASER;
-    updateSizeDisplay();
-}
-
-function changeSize(delta) {
-    const sizes = currentTool === 'pen' ? BRUSH_SIZES : ERASER_SIZES;
-    const currentIndex = sizes.indexOf(currentSize);
-    const newIndex = Math.max(0, Math.min(sizes.length - 1, currentIndex + delta));
-    currentSize = sizes[newIndex];
-    updateSizeDisplay();
-}
-
-function updateSizeDisplay() {
-    const display = document.getElementById('size-value');
-    display.textContent = currentSize;
-    display.style.fontSize = `${Math.min(20, currentSize / 2)}px`;
-}
-
-function startDrawing(e) {
-    e.preventDefault();
-    isDrawing = true;
-    const rect = canvas.getBoundingClientRect();
-    lastX = e.clientX - rect.left;
-    lastY = e.clientY - rect.top;
-    saveState();
-}
-
-function draw(e) {
-    if (!isDrawing) return;
-    e.preventDefault();
-
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    const layer = getActiveLayer();
-    const lctx = layer.ctx;
-
-    if (currentTool === 'eraser') {
-        lctx.globalCompositeOperation = 'destination-out';
-    } else {
-        lctx.globalCompositeOperation = 'source-over';
-        lctx.strokeStyle = currentColor;
-    }
-
-    lctx.lineWidth = currentSize;
-    lctx.lineCap = 'round';
-    lctx.lineJoin = 'round';
-
-    lctx.beginPath();
-    lctx.moveTo(lastX, lastY);
-    lctx.lineTo(x, y);
-    lctx.stroke();
-
-    lastX = x;
-    lastY = y;
-
-    renderAll();
-}
-
-function stopDrawing() {
-    if (isDrawing) {
-        isDrawing = false;
-        saveState();
-    }
-}
-
-function changeColor(e) {
-    currentColor = e.target.value;
-    if (currentTool === 'eraser') {
-        setTool('pen');
-    }
-}
-
-function saveState() {
-    const layer = getActiveLayer();
-    undoStack.push(layer.ctx.getImageData(0, 0, canvas.width, canvas.height));
-    redoStack = [];
-    updateUndoRedoButtons();
-}
-
-function undo() {
-    if (undoStack.length > 1) {
-        const layer = getActiveLayer();
-        redoStack.push(undoStack.pop());
-        layer.ctx.putImageData(undoStack[undoStack.length - 1], 0, 0);
-        renderAll();
-        updateUndoRedoButtons();
-    }
-}
-
-function redo() {
-    if (redoStack.length > 0) {
-        const layer = getActiveLayer();
-        const state = redoStack.pop();
-        undoStack.push(state);
-        layer.ctx.putImageData(state, 0, 0);
-        renderAll();
-        updateUndoRedoButtons();
-    }
-}
-
-function updateUndoRedoButtons() {
-    document.getElementById('tool-undo').disabled = undoStack.length <= 1;
-    document.getElementById('tool-redo').disabled = redoStack.length === 0;
-}
-
-function clearActiveLayer() {
-    const doClear = () => {
-        saveState();
-        const layer = getActiveLayer();
-        layer.ctx.clearRect(0, 0, canvas.width, canvas.height);
-        renderAll();
+// === ЛОГІКА ФІГУР ===
+function spawnPiece() {
+    const randomPiece = PIECES[Math.floor(Math.random() * PIECES.length)];
+    currentPiece = {
+        matrix: randomPiece.matrix,
+        color: randomPiece.color,
+        pos: { x: Math.floor(COLS / 2) - Math.floor(randomPiece.matrix[0].length / 2), y: 0 }
     };
 
-    if (WebApp && WebApp.platform !== 'unknown') {
-        WebApp.showConfirm('Очистити активний шар?', (isOk) => {
-            if (isOk) doClear();
-        });
-    } else {
-        if (confirm('Очистити активний шар?')) doClear();
+    // Перевірка на Game Over
+    if (checkCollision(board, currentPiece)) {
+        isGameOver = true;
+        alert(`Гру завершено! Рахунок: ${score}`);
+        // Тут можна додати логіку перезапуску
     }
 }
 
-function updateLayersUI() {
-    const container = document.getElementById('layers-list');
-    container.innerHTML = '';
+function dropPiece() {
+    currentPiece.pos.y++;
+    dropCounter = 0;
+    if (checkCollision(board, currentPiece)) {
+        currentPiece.pos.y--; // Повертаємо назад
+        mergePiece(); // Фіксуємо фігуру
+        clearLines(); // Очищуємо лінії
+        spawnPiece(); // Створюємо нову фігуру
+    }
+}
 
-    layers.forEach((layer, i) => {
-        const item = document.createElement('div');
-        item.className = 'layer-item';
-        if (i === activeLayerIndex) item.classList.add('active');
+function movePiece(dir) {
+    currentPiece.pos.x += dir;
+    if (checkCollision(board, currentPiece)) {
+        currentPiece.pos.x -= dir; // Скасувати рух, якщо зіткнення
+    }
+}
 
-        const visibilityBtn = document.createElement('button');
-        visibilityBtn.className = 'layer-btn';
-        visibilityBtn.innerHTML = layer.visible ? '👁' : '👁‍🗨';
-        visibilityBtn.onclick = () => toggleLayerVisibility(i);
+function rotatePiece() {
+    const matrix = currentPiece.matrix;
+    const N = matrix.length;
+    let newMatrix = matrix.map((row, i) => row.map((_, j) => matrix[N - 1 - j][i]));
+    
+    // Проста перевірка на зіткнення після обертання
+    const originalMatrix = currentPiece.matrix;
+    currentPiece.matrix = newMatrix;
+    if (checkCollision(board, currentPiece)) {
+        currentPiece.matrix = originalMatrix; // Скасувати обертання
+    }
+}
 
-        const nameSpan = document.createElement('span');
-        nameSpan.textContent = layer.name;
-        nameSpan.onclick = () => setActiveLayer(i);
+// === ПЕРЕВІРКА ТА ОЧИЩЕННЯ ===
+function checkCollision(board, piece) {
+    const [m, p] = [piece.matrix, piece.pos];
+    for (let y = 0; y < m.length; y++) {
+        for (let x = 0; x < m[y].length; x++) {
+            if (m[y][x] !== 0 && (
+                board[y + p.y] && board[y + p.y][x + p.x]
+            ) !== 0) {
+                return true; // Зіткнення з існуючими блоками
+            }
+            if (m[y][x] !== 0 && (
+                x + p.x < 0 || // Зіткнення з лівою стінкою
+                x + p.x >= COLS || // Зіткнення з правою стінкою
+                y + p.y >= ROWS // Зіткнення з дном
+            )) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
 
-        const controls = document.createElement('div');
-        controls.className = 'layer-controls';
-
-        const upBtn = document.createElement('button');
-        upBtn.className = 'layer-btn';
-        upBtn.innerHTML = '↑';
-        upBtn.onclick = () => moveLayerUp(i);
-
-        const downBtn = document.createElement('button');
-        downBtn.className = 'layer-btn';
-        downBtn.innerHTML = '↓';
-        downBtn.onclick = () => moveLayerDown(i);
-
-        const delBtn = document.createElement('button');
-        delBtn.className = 'layer-btn';
-        delBtn.innerHTML = '×';
-        delBtn.onclick = () => deleteLayer(i);
-
-        controls.appendChild(upBtn);
-        controls.appendChild(downBtn);
-        if (layers.length > 1) controls.appendChild(delBtn);
-
-        item.appendChild(visibilityBtn);
-        item.appendChild(nameSpan);
-        item.appendChild(controls);
-        container.appendChild(item);
+function mergePiece() {
+    currentPiece.matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+            if (value !== 0) {
+                board[y + currentPiece.pos.y][x + currentPiece.pos.x] = currentPiece.color;
+            }
+        });
     });
 }
 
-function saveArt() {
-    const saved = layers.map(layer => ({
-        dataUrl: layer.canvas.toDataURL('image/png'),
-        visible: layer.visible,
-        name: layer.name
-    }));
-    localStorage.setItem('morstrix_layers', JSON.stringify(saved));
-}
+function clearLines() {
+    outer: for (let y = ROWS - 1; y >= 0; y--) {
+        for (let x = 0; x < COLS; x++) {
+            if (board[y][x] === 0) {
+                continue outer; // Неповна лінія
+            }
+        }
 
-function loadArt() {
-    const saved = localStorage.getItem('morstrix_layers');
-    if (saved) {
-        const data = JSON.parse(saved);
-        layers = [];
-        data.forEach((item, i) => {
-            createLayer(item.name.replace(/\s\d+$/, ''));
-            const layer = layers[i];
-            layer.visible = item.visible;
-            const img = new Image();
-            img.onload = () => {
-                layer.ctx.drawImage(img, 0, 0);
-                if (i === data.length - 1) {
-                    setActiveLayer(0);
-                    renderAll();
-                }
-            };
-            img.src = item.dataUrl;
-        });
-    } else {
-        saveState();
+        // Лінія повна: очистити
+        const row = board.splice(y, 1)[0].fill(0); // Видаляємо та очищаємо
+        board.unshift(row); // Додаємо порожню лінію нагору
+        y++; // Повторно перевіряємо цю ж позицію (бо всі лінії змістилися)
+        updateScore(100);
     }
 }
 
-window.addEventListener('load', init);
+function updateScore(points) {
+    score += points;
+    document.getElementById('score').innerText = score;
+    // Проста логіка підвищення рівня
+    level = Math.floor(score / 500) + 1;
+    document.getElementById('level').innerText = level;
+    dropInterval = Math.max(100, INITIAL_DROP_SPEED - (level - 1) * 50);
+}
+
+
+// === МАЛЮВАННЯ ===
+function drawMatrix(matrix, offset, color) {
+    matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+            if (value !== 0) {
+                ctx.fillStyle = color;
+                ctx.fillRect((x + offset.x) * BLOCK_SIZE, (y + offset.y) * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                ctx.strokeStyle = '#000'; // Додаємо рамку для видимості блоків
+                ctx.strokeRect((x + offset.x) * BLOCK_SIZE, (y + offset.y) * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+            }
+        });
+    });
+}
+
+function draw() {
+    // Очищення екрану
+    ctx.fillStyle = 'var(--grid)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Малювання ігрового поля (фіксованих блоків)
+    board.forEach((row, y) => {
+        row.forEach((value, x) => {
+            if (value !== 0) {
+                drawMatrix([[1]], { x: x, y: y }, value);
+            }
+        });
+    });
+
+    // Малювання поточної фігури
+    if (currentPiece) {
+        drawMatrix(currentPiece.matrix, currentPiece.pos, currentPiece.color);
+    }
+}
+
+// === ОБРОБКА ПОДІЙ ===
+function setupEvents() {
+    document.getElementById('left-btn').addEventListener('click', () => movePiece(-1));
+    document.getElementById('right-btn').addEventListener('click', () => movePiece(1));
+    document.getElementById('down-btn').addEventListener('click', () => {
+        dropPiece();
+        // Прискорений рух вниз
+        dropCounter = dropInterval; 
+    });
+    document.getElementById('rotate-btn').addEventListener('click', () => rotatePiece());
+
+    // Управління з клавіатури (для тестування на ПК)
+    document.addEventListener('keydown', e => {
+        if (e.key === 'ArrowLeft') movePiece(-1);
+        else if (e.key === 'ArrowRight') movePiece(1);
+        else if (e.key === 'ArrowDown') dropPiece();
+        else if (e.key === 'ArrowUp') rotatePiece();
+    });
+}
+
+init();

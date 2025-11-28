@@ -3,152 +3,87 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MORSTRIX | PAINT</title>
+    <title>MORSTRIX | TETRIS</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        :root {--bg:#000; --border:#0f0; --text:#0f0; --accent:#008000;}
-        *{margin:0;padding:0;box-sizing:border-box;}
+        :root {
+            --bg: #111;
+            --border: #444;
+            --text: #fff;
+            --grid: #222;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body {
-            touch-action: none;
-            overscroll-behavior: none;
-            -webkit-user-select: none;
-            user-select: none;
-            background:var(--bg);
-            overflow:hidden;
+            background: var(--bg);
+            color: var(--text);
             font-family: system-ui, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            overflow: hidden;
         }
-        #paint-canvas{
-            display:block;
-            width:100%;
-            height:100vh;
-            touch-action: none;
+        #game-info {
+            font-size: 1.2em;
+            padding: 10px;
+            display: flex;
+            justify-content: space-around;
+            width: 90%;
+            max-width: 300px;
         }
-        .toolbar{
-            position:fixed;bottom:0;left:0;right:0;
-            background:rgba(0,0,0,0.92);padding:8px;
-            display:flex;justify-content:center;align-items:center;
-            gap:10px;border-top:2px solid var(--border);
-            flex-wrap: wrap;
-        }
-        .btn{
-            width:44px;height:44px;border:2px solid var(--border);
-            background:#111;color:var(--text);cursor:pointer;
-            font-size:20px;display:flex;align-items:center;justify-content:center;
-            border-radius:8px;
-            transition: all 0.2s;
-        }
-        .btn:active{transform:scale(0.9);}
-        .btn.active{box-shadow:0 0 12px var(--border); background:#222;}
-        .btn.disabled{opacity:0.3; cursor:not-allowed;}
-        
-        #color-picker {
-            -webkit-appearance: none;
-            -moz-appearance: none;
-            appearance: none;
-            padding: 0;
-            background: #111;
+        #tetris-canvas {
             border: 2px solid var(--border);
-            width: 44px;
-            height: 44px;
+            background: var(--grid);
+            display: block;
+            margin-bottom: 20px;
+        }
+        .controls {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            padding: 10px 0;
+            background: rgba(17, 17, 17, 0.9);
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+        .ctrl-btn {
+            padding: 15px 25px;
+            font-size: 1.5em;
+            background: #333;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
             cursor: pointer;
-            border-radius:8px;
+            user-select: none;
+            flex-grow: 1;
+            max-width: 100px;
         }
-        #color-picker::-webkit-color-swatch-wrapper {padding:3px;}
-        #color-picker::-webkit-color-swatch {border:2px solid #555;border-radius:4px;}
-        #color-picker::-moz-color-swatch {border:2px solid #555;border-radius:4px;padding:3px;}
-
-        .size-control {
-            display:flex;align-items:center;gap:6px;background:#111;
-            border:2px solid var(--border);border-radius:8px;padding:0 8px;
+        #rotate-btn {
+            background: #008000;
         }
-        .size-btn{font-size:18px;width:32px;height:32px;}
-
-        #size-value {
-            min-width:24px;text-align:center;font-weight:bold;
-            color:var(--text);font-size:14px;
-        }
-
-        /* ПАНЕЛЬ ШАРІВ */
-        .layers-panel {
-            position: fixed; top: 0; right: 0; width: 200px; height: 100vh;
-            background: rgba(0,0,0,0.9); border-left: 2px solid var(--border);
-            padding: 12px; overflow-y: auto; font-size: 12px;
-            transition: transform 0.3s ease;
-            transform: translateX(0);
-        }
-        .layers-header {
-            display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 8px; color: var(--text); font-weight: bold;
-        }
-        #add-layer {width: 32px; height: 32px; font-size: 18px;}
-        .layers-list {display: flex; flex-direction: column; gap: 6px;}
-        .layer-item {
-            display: flex; align-items: center; gap: 6px;
-            background: #111; border: 1px solid #333; border-radius: 6px;
-            padding: 4px; font-size: 11px;
-        }
-        .layer-item.active {border-color: var(--border); background: #222;}
-        .layer-btn {
-            width: 24px; height: 24px; background: #222; border: none;
-            color: var(--text); font-size: 14px; cursor: pointer;
-            border-radius: 4px; display: flex; align-items: center; justify-content: center;
-        }
-        .layer-btn:hover {background: #333;}
-        .layer-controls {margin-left: auto; display: flex; gap: 2px;}
-        .layer-name {flex: 1; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
-
-        /* КНОПКА ПРИХОВАННЯ ПАНЕЛІ */
-        #toggle-layers {
-            position: fixed; top: 50%; right: 0; transform: translateY(-50%);
-            width: 32px; height: 64px; background: rgba(0,0,0,0.8);
-            border: 2px solid var(--border); border-right: none;
-            color: var(--text); font-size: 18px; cursor: pointer;
-            border-radius: 8px 0 0 8px; z-index: 1000;
-            display: flex; align-items: center; justify-content: center;
+        #down-btn {
+            background: #800000;
         }
     </style>
 </head>
 <body>
 
-<canvas id="paint-canvas"></canvas>
-
-<!-- КНОПКА ПРИХОВАННЯ -->
-<button id="toggle-layers" class="btn">◀</button>
-
-<!-- ПАНЕЛЬ ШАРІВ -->
-<div class="layers-panel">
-    <div class="layers-header">
-        <span>ШАРИ</span>
-        <button id="add-layer" class="btn">+</button>
-    </div>
-    <div id="layers-list" class="layers-list"></div>
+<div id="game-info">
+    <span>Рахунок: <span id="score">0</span></span>
+    <span>Рівень: <span id="level">1</span></span>
 </div>
 
-<!-- ПАНЕЛЬ ІНСТРУМЕНТІВ -->
-<div class="toolbar">
-    <button id="tool-pen" class="btn active" title="Пензель">✎</button>
-    <button id="tool-eraser" class="btn" title="Стирачка">✖</button>
-    
-    <div class="size-control">
-        <button id="size-minus" class="btn size-btn" title="Менше">−</button>
-        <span id="size-value">8</span>
-        <button id="size-plus" class="btn size-btn" title="Більше">+</button>
-    </div>
+<canvas id="tetris-canvas"></canvas>
 
-    <input type="color" id="color-picker" class="btn" value="#ffffff" title="Колір">
-
-    <!-- UNDO/REDO В ОДНОМУ РЯДКУ -->
-    <button id="tool-undo" class="btn" title="Скасувати">↺</button>
-    <button id="tool-redo" class="btn" title="Повторити">↻</button>
-    <button id="tool-clear" class="btn" title="Очистити шар">🗑</button>
+<div class="controls">
+    <button id="left-btn" class="ctrl-btn">◀</button>
+    <button id="rotate-btn" class="ctrl-btn">↻</button>
+    <button id="right-btn" class="ctrl-btn">▶</button>
+    <button id="down-btn" class="ctrl-btn">⬇</button>
 </div>
 
-<script>
-    const script = document.createElement('script');
-    script.src = 'drafts.js?v=' + Date.now();
-    script.defer = true;
-    document.head.appendChild(script);
-</script>
-
+<script src="drafts.js"></script>
 </body>
 </html>
