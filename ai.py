@@ -85,7 +85,6 @@ async def _get_gemini_response(user_text):
 async def _check_and_reply_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """
     Проверяет, является ли пользователь участником целевого чата.
-    Использует объекты ChatMemberStatus для корректного сравнения.
     """
     if not TELEGRAM_CHAT_ID:
         return True
@@ -101,13 +100,11 @@ async def _check_and_reply_subscription(update: Update, context: ContextTypes.DE
             user_id=user_id
         )
         
-        # ✅ КРИТИЧНЕ ВИПРАВЛЕННЯ: Використовуємо об'єкти ChatMemberStatus для коректного порівняння.
-        # Додано RESTRICTED, щоб охопити всі можливі стани активного члена/адміна.
-        is_member = chat_member.status in [
-            ChatMemberStatus.MEMBER, 
-            ChatMemberStatus.ADMINISTRATOR, 
-            ChatMemberStatus.OWNER,
-            ChatMemberStatus.RESTRICTED
+        # ✅ ФІНАЛЬНЕ ВИПРАВЛЕННЯ: Явно виключаємо лише 'LEFT' та 'KICKED'. 
+        # Будь-який інший статус (member, administrator, creator, restricted) вважається підпискою.
+        is_member = chat_member.status not in [
+            ChatMemberStatus.LEFT, 
+            ChatMemberStatus.KICKED
         ]
 
         if not is_member:
