@@ -3,8 +3,8 @@ import time
 # ✅ Видалено ChatMember, залишено Chat
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Chat
 from telegram.ext import ContextTypes
-# ✅ НОВЕ: Додано імпорт ChatMemberStatus для коректної перевірки підписки
-from telegram.constants import ChatMemberStatus
+# ✅ ВИПРАВЛЕНО: Додано імпорт ChatMemberStatus
+from telegram.constants import ChatMemberStatus 
 from dotenv import load_dotenv
 import google.generativeai as genai
 from google.api_core.exceptions import GoogleAPICallError 
@@ -116,16 +116,16 @@ async def _check_and_reply_subscription(update: Update, context: ContextTypes.DE
         ]
 
         if not is_member:
-            # Змінено текст відповіді, щоб був простим текстом без Markdown
             await update.message.reply_text(
-                "тільки для членів клубу 👑",
+                "тільки для членів клубу 👑", # Додав емодзі для стилю
                 reply_markup=reply_markup
             )
             return False
             
     except Exception as e:
         print(f"Помилка перевірки підписки для користувача {user_id}: {e}")
-        # Залишаємо висновок, що підписку перевірити не вдалося, тому відповіді немає.
+        # Якщо бот не є адміністратором у цільовому каналі/чаті, він не зможе перевірити підписку.
+        # У цьому випадку повертаємо False.
         await update.message.reply_text("не можу перевірити підписку ⚠️") 
         return False
     
@@ -136,6 +136,11 @@ async def handle_gemini_message_group(update: Update, context: ContextTypes.DEFA
     Обрабатывает сообщения в групповом чате, содержащие слово "ало" (только текст).
     """
     if not update.message: 
+        return
+
+    # ✅ ВИПРАВЛЕНО: Додана перевірка на наявність ключового слова на початку,
+    # що дозволяє уникнути непотрібних перевірок ID чату та підписки.
+    if update.message.text is None or "ало" not in update.message.text.lower():
         return
 
     current_chat_id_str = str(update.effective_chat.id)
@@ -150,9 +155,7 @@ async def handle_gemini_message_group(update: Update, context: ContextTypes.DEFA
     if not is_subscribed:
         return
 
-    if not update.message.text:
-        return
-
+    # Тут update.message.text вже перевірено на не-None вище
     await update.message.reply_chat_action("typing")
     user_text = update.message.text
     
