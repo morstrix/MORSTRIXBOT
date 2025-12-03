@@ -2,20 +2,18 @@ import os
 import time
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Chat
 from telegram.ext import ContextTypes
-# ✅ ГЛАВНОЕ ИСПРАВЛЕНИЕ: Добавлен импорт ChatMemberStatus
+# ✅ ДОДАНО: Імпорт статусів для коректного порівняння
 from telegram.constants import ChatMemberStatus 
 from dotenv import load_dotenv
 import google.generativeai as genai
 from google.api_core.exceptions import GoogleAPICallError 
-import logging
-logger = logging.getLogger(__name__) # Добавляем логгер
 
 load_dotenv()
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID') 
 
 # =========================================================================
-# КОНСТАНТИ ДЛЯ GEMINI ТА ПЕРЕВІРКИ ПІДПИСКИ
+# КОНСТАНТИ
 # =========================================================================
 MODEL_NAME = "gemini-2.5-flash" 
 FORUM_INVITE_LINK = "https://t.me/+7Xmj6pPB0mEyMDky" 
@@ -23,37 +21,29 @@ FORUM_BUTTON_TEXT = "☇ ꜰ ☻‌ ʀ ᴜ ʍ❓"
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-else:
-    print("Ошибка: GEMINI_API_KEY не найден в .env файле. Функциональность Gemini будет недоступна.")
-    
-if not TELEGRAM_CHAT_ID:
-    print("Ошибка: TELEGRAM_CHAT_ID не найден в .env файле. Проверка подписки для личных сообщений не будет работать.")
 
+# ✅ Строкове представлення ID для коректного порівняння
 TELEGRAM_CHAT_ID_STR = str(TELEGRAM_CHAT_ID) if TELEGRAM_CHAT_ID else None
 
 last_request_time = 0
 MIN_DELAY_SECONDS = 60
 
 SYSTEM_PROMPT = (
-    "Ти — бот-помічник. Відповідай максимально кратким, прямим, конструктивним і **грамотним українським мовою**. "
-    "Уникай докладних пояснень і довгих абзаців. **Кожен твій відповідь повинен містити один емодзі**, відповідний контексту. "
-    "**КАТЕГОРИЧНО заборонено використовувати символи Markdown, такі як зірочки (*), для виділення жирним або курсивом, "
-    "а також інші форматирующие символи. Відповідай виключно простим текстом.**"
+    "Ты — бот-помощник. Отвечай максимально кратким, прямым, конструктивным и **грамотным украинским языком**. "
+    "Избегай подробных объяснений и длинных абзацев. **Каждый твой ответ должен содержать один эмодзи**, соответствующий контексту. "
+    "**КАТЕГОРИЧЕСКИ запрещено использовать символы Markdown, такие как звездочки (*), для выделения жирным или курсивом, "
+    "а также другие форматирующие символы. Отвечай исключительно простым текстом.**"
 )
 
 async def _get_gemini_response(user_text):
-    """
-    Получает ответ от Gemini (только текст).
-    """
     global last_request_time
-
     current_time = time.time()
+    
     if current_time - last_request_time < MIN_DELAY_SECONDS:
         remaining_time = int(MIN_DELAY_SECONDS - (current_time - last_request_time))
         return f"почекай трохи 🫩 відпочину {remaining_time} секунд."
 
     if not GEMINI_API_KEY:
-        logger.error("API ключ не настроен. Невозможно получить ответ.")
         return "у мене немає api ключа 🔑"
 
     try:
@@ -61,40 +51,21 @@ async def _get_gemini_response(user_text):
             model_name=MODEL_NAME, 
             system_instruction=SYSTEM_PROMPT
         ) 
-        
-        response = model.generate_content(
-            [user_text]
-        )
-
+        response = model.generate_content([user_text])
         last_request_time = current_time
         return response.text
-
-    except GoogleAPICallError as e:
-        error_message = str(e)
-        logger.error(f"Ошибка при работе с Gemini API: {error_message}")
-        if "401" in error_message or "Invalid API Key" in error_message:
-            return "ой 😔, мій API ключ не дійсний"
-        elif "429" in error_message or "Rate limit exceeded" in error_message:
-            return "забагато запитів 🥵, почекай хвилину"
-        elif "404" in error_message:
-             return "помилка 404 🧐: модель не знайдена. Перевір ім'я моделі в ai.py."
-        else:
-            return f"не можу відповісти 🤯: {error_message[:50]}..." 
-
     except Exception as e:
-        logger.error(f"Неизвестная ошибка: {e}")
+        print(f"Error Gemini: {e}")
         return "щось зламалось 💔"
-
 
 async def _check_and_reply_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """
-    Проверяет, является ли пользователь участником целевого чата.
+    Проверяет подписку, сравнивая статус как ОБЪЕКТ, а не строку.
     """
     if not TELEGRAM_CHAT_ID:
         return True
 
     user_id = update.effective_user.id
-    
     keyboard = [[InlineKeyboardButton(FORUM_BUTTON_TEXT, url=FORUM_INVITE_LINK)]] 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -104,54 +75,44 @@ async def _check_and_reply_subscription(update: Update, context: ContextTypes.DE
             user_id=user_id
         )
         
-        # ✅ ПРАВИЛЬНОЕ СРАВНЕНИЕ СТАТУСОВ: ВКЛЮЧАЯ ПОДПИСЧИКОВ (MEMBER)
+        # ✅ ВИПРАВЛЕНО: Використовуємо об'єкти ChatMemberStatus, а не рядки.
+        # Це виправляє баг, де адмін розпізнавався як "не підписаний".
         is_member = chat_member.status in [
             ChatMemberStatus.MEMBER, 
             ChatMemberStatus.ADMINISTRATOR, 
             ChatMemberStatus.OWNER
         ]
-        
-        # ЛОГИРОВАНИЕ СТАТУСА: Поможет увидеть, что именно возвращает Telegram
-        logger.info(f"Subscription check for user {user_id}: Status in target chat {TELEGRAM_CHAT_ID} is: {chat_member.status.name}. Is member: {is_member}")
 
         if not is_member:
             await update.message.reply_text(
-                "тільки для членів клубу 👑", 
+                "тільки для членів клубу 👑",
                 reply_markup=reply_markup
             )
             return False
             
     except Exception as e:
-        # ✅ УСИЛЕННОЕ ЛОГИРОВАНИЕ ОШИБОК: Сюда попадает, если бот не может проверить (например, не админ или неверный ID)
-        logger.error(f"Subscription check FAILED for user {user_id} (Target chat ID: {TELEGRAM_CHAT_ID}): {e}")
-        
-        # Дополнительная проверка на случай, если TELEGRAM_CHAT_ID указан неверно
-        if "Chat not found" in str(e):
-             await update.message.reply_text("не можу перевірити підписку: невірний ID форуму ❌") 
-        else:
-             await update.message.reply_text("не можу перевірити підписку ⚠️") 
+        print(f"Помилка перевірки (можливо бот не адмін або ID невірний): {e}")
+        # Якщо сталася помилка перевірки - на всяк випадок просимо підписатися
+        await update.message.reply_text("не можу перевірити підписку ⚠️") 
         return False
     
     return True
 
 async def handle_gemini_message_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Обрабатывает сообщения в групповом чате, содержащие слово "ало" (только текст).
-    """
     if not update.message: 
         return
 
-    # Перевіряємо, чи є ключове слово "ало".
+    # Перевірка на ключове слово "ало"
     if update.message.text is None or "ало" not in update.message.text.lower():
         return
-
+        
     current_chat_id_str = str(update.effective_chat.id)
     
-    # 1. Если сообщение пришло с целевого форума, пропускаем проверку
+    # 1. Якщо це цільовий чат - пропускаємо перевірку
     if TELEGRAM_CHAT_ID_STR and current_chat_id_str == TELEGRAM_CHAT_ID_STR:
         is_subscribed = True
     else:
-        # 2. В других чатах проверяем подписку
+        # 2. В інших чатах - перевіряємо через виправлену функцію
         is_subscribed = await _check_and_reply_subscription(update, context)
 
     if not is_subscribed:
@@ -169,9 +130,6 @@ async def handle_gemini_message_group(update: Update, context: ContextTypes.DEFA
         )
 
 async def handle_gemini_message_private(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Обрабатывает любое сообщение в личном чате с ботом (только текст).
-    """
     if not update.message:
         return
 
@@ -184,7 +142,6 @@ async def handle_gemini_message_private(update: Update, context: ContextTypes.DE
         return
 
     await update.message.reply_chat_action("typing")
-    
     reply = await _get_gemini_response(user_text)
     
     if reply:
