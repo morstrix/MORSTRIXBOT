@@ -100,7 +100,7 @@ async def _check_and_reply_subscription(update: Update, context: ContextTypes.DE
     
     if not cleaned_chat_id:
         logger.error("TELEGRAM_CHAT_ID містить лише пробіли або відсутній після очищення.")
-        await update.message.reply_text("не можу перевірити підписку 💔: ID чату порожній.")
+        await update.message.reply_text("не можу перевірити підписку 💔")
         return False 
 
     user_id = update.effective_user.id
@@ -139,9 +139,7 @@ async def _check_and_reply_subscription(update: Update, context: ContextTypes.DE
             
             # Фінальна помилка після всіх спроб
             await update.message.reply_text(
-                "не можу перевірити підписку ⚠️\n"
-                "**Помилка доступу (Forbidden).** Перевір, чи є бот **адміністратором** у чаті з ID:\n"
-                f"`{cleaned_chat_id}`"
+                "не можу перевірити підписку ⚠️"
             ) 
             return False
             
