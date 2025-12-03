@@ -1,13 +1,14 @@
 import os
 import time
-# ✅ Видалено ChatMember, залишено Chat
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Chat
 from telegram.ext import ContextTypes
-# ✅ ВИПРАВЛЕНО: Додано імпорт ChatMemberStatus для коректної перевірки підписки
+# ✅ ГЛАВНОЕ ИСПРАВЛЕНИЕ: Добавлен импорт ChatMemberStatus
 from telegram.constants import ChatMemberStatus 
 from dotenv import load_dotenv
 import google.generativeai as genai
 from google.api_core.exceptions import GoogleAPICallError 
+import logging
+logger = logging.getLogger(__name__) # Добавляем логгер
 
 load_dotenv()
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
@@ -28,7 +29,6 @@ else:
 if not TELEGRAM_CHAT_ID:
     print("Ошибка: TELEGRAM_CHAT_ID не найден в .env файле. Проверка подписки для личных сообщений не будет работать.")
 
-# ✅ Строкове представлення ID для коректного порівняння
 TELEGRAM_CHAT_ID_STR = str(TELEGRAM_CHAT_ID) if TELEGRAM_CHAT_ID else None
 
 last_request_time = 0
@@ -53,7 +53,7 @@ async def _get_gemini_response(user_text):
         return f"почекай трохи 🫩 відпочину {remaining_time} секунд."
 
     if not GEMINI_API_KEY:
-        print("API ключ не настроен. Невозможно получить ответ.")
+        logger.error("API ключ не настроен. Невозможно получить ответ.")
         return "у мене немає api ключа 🔑"
 
     try:
@@ -71,7 +71,7 @@ async def _get_gemini_response(user_text):
 
     except GoogleAPICallError as e:
         error_message = str(e)
-        print(f"Ошибка при работе с Gemini API: {error_message}")
+        logger.error(f"Ошибка при работе с Gemini API: {error_message}")
         if "401" in error_message or "Invalid API Key" in error_message:
             return "ой 😔, мій API ключ не дійсний"
         elif "429" in error_message or "Rate limit exceeded" in error_message:
@@ -82,7 +82,7 @@ async def _get_gemini_response(user_text):
             return f"не можу відповісти 🤯: {error_message[:50]}..." 
 
     except Exception as e:
-        print(f"Неизвестная ошибка: {e}")
+        logger.error(f"Неизвестная ошибка: {e}")
         return "щось зламалось 💔"
 
 
@@ -91,7 +91,6 @@ async def _check_and_reply_subscription(update: Update, context: ContextTypes.DE
     Проверяет, является ли пользователь участником целевого чата.
     """
     if not TELEGRAM_CHAT_ID:
-        # Якщо ID цільового чату не встановлено, вважаємо підписку підтвердженою.
         return True
 
     user_id = update.effective_user.id
@@ -105,13 +104,15 @@ async def _check_and_reply_subscription(update: Update, context: ContextTypes.DE
             user_id=user_id
         )
         
-        # ✅ ВИПРАВЛЕННЯ БАГА: Використовуємо константи ChatMemberStatus
+        # ✅ ПРАВИЛЬНОЕ СРАВНЕНИЕ СТАТУСОВ: ВКЛЮЧАЯ ПОДПИСЧИКОВ (MEMBER)
         is_member = chat_member.status in [
             ChatMemberStatus.MEMBER, 
             ChatMemberStatus.ADMINISTRATOR, 
-            ChatMemberStatus.OWNER,
-            # Також враховуємо 'creator' як 'OWNER'
+            ChatMemberStatus.OWNER
         ]
+        
+        # ЛОГИРОВАНИЕ СТАТУСА: Поможет увидеть, что именно возвращает Telegram
+        logger.info(f"Subscription check for user {user_id}: Status in target chat {TELEGRAM_CHAT_ID} is: {chat_member.status.name}. Is member: {is_member}")
 
         if not is_member:
             await update.message.reply_text(
@@ -121,10 +122,14 @@ async def _check_and_reply_subscription(update: Update, context: ContextTypes.DE
             return False
             
     except Exception as e:
-        # Якщо тут виникає помилка (наприклад, Forbidden: bot is not an administrator), 
-        # це означає, що бот не має прав для перевірки підписки.
-        print(f"Помилка перевірки підписки для користувача {user_id}: {e}")
-        await update.message.reply_text("не можу перевірити підписку ⚠️") 
+        # ✅ УСИЛЕННОЕ ЛОГИРОВАНИЕ ОШИБОК: Сюда попадает, если бот не может проверить (например, не админ или неверный ID)
+        logger.error(f"Subscription check FAILED for user {user_id} (Target chat ID: {TELEGRAM_CHAT_ID}): {e}")
+        
+        # Дополнительная проверка на случай, если TELEGRAM_CHAT_ID указан неверно
+        if "Chat not found" in str(e):
+             await update.message.reply_text("не можу перевірити підписку: невірний ID форуму ❌") 
+        else:
+             await update.message.reply_text("не можу перевірити підписку ⚠️") 
         return False
     
     return True
@@ -142,11 +147,11 @@ async def handle_gemini_message_group(update: Update, context: ContextTypes.DEFA
 
     current_chat_id_str = str(update.effective_chat.id)
     
-    # 1. Якщо повідомлення прийшло з цільового чату (форуму), пропускаємо перевірку підписки
+    # 1. Если сообщение пришло с целевого форума, пропускаем проверку
     if TELEGRAM_CHAT_ID_STR and current_chat_id_str == TELEGRAM_CHAT_ID_STR:
         is_subscribed = True
     else:
-        # 2. В усіх інших чатах перевіряємо підписку на цільовий чат
+        # 2. В других чатах проверяем подписку
         is_subscribed = await _check_and_reply_subscription(update, context)
 
     if not is_subscribed:
