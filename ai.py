@@ -153,8 +153,7 @@ async def _check_and_reply_subscription(update: Update, context: ContextTypes.DE
 
             # Фінальна помилка після всіх спроб
             await update.message.reply_text(
-                "не можу перевірити підписку ⚠️\n"
-                "**Помилка запиту (BadRequest).** Перевір, чи вірний `TELEGRAM_CHAT_ID` в конфігурації. ID повинен починатися з `-100`."
+                "не можу перевірити підписку ⚠️
             ) 
             return False
             
