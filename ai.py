@@ -3,7 +3,7 @@ import time
 # ✅ Видалено ChatMember, залишено Chat
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Chat
 from telegram.ext import ContextTypes
-# ✅ ВИПРАВЛЕНО: Додано імпорт ChatMemberStatus
+# ✅ ВИПРАВЛЕНО: Додано імпорт ChatMemberStatus для коректної перевірки підписки
 from telegram.constants import ChatMemberStatus 
 from dotenv import load_dotenv
 import google.generativeai as genai
@@ -28,13 +28,12 @@ else:
 if not TELEGRAM_CHAT_ID:
     print("Ошибка: TELEGRAM_CHAT_ID не найден в .env файле. Проверка подписки для личных сообщений не будет работать.")
 
-# ✅ НОВЕ: Строкове представлення ID для коректного порівняння
+# ✅ Строкове представлення ID для коректного порівняння
 TELEGRAM_CHAT_ID_STR = str(TELEGRAM_CHAT_ID) if TELEGRAM_CHAT_ID else None
 
 last_request_time = 0
 MIN_DELAY_SECONDS = 60
 
-# ✅ ИСПРАВЛЕННЫЙ PROMPT: Возвращен запрет на Markdown и требование краткости
 SYSTEM_PROMPT = (
     "Ти — бот-помічник. Відповідай максимально кратким, прямим, конструктивним і **грамотним українським мовою**. "
     "Уникай докладних пояснень і довгих абзаців. **Кожен твій відповідь повинен містити один емодзі**, відповідний контексту. "
@@ -63,7 +62,6 @@ async def _get_gemini_response(user_text):
             system_instruction=SYSTEM_PROMPT
         ) 
         
-        # ✅ ИСПРАВЛЕНО: Передача user_text как списка [user_text]
         response = model.generate_content(
             [user_text]
         )
@@ -84,7 +82,6 @@ async def _get_gemini_response(user_text):
             return f"не можу відповісти 🤯: {error_message[:50]}..." 
 
     except Exception as e:
-        # Теперь этот блок ловит только действительно неожиданные ошибки
         print(f"Неизвестная ошибка: {e}")
         return "щось зламалось 💔"
 
@@ -108,24 +105,25 @@ async def _check_and_reply_subscription(update: Update, context: ContextTypes.DE
             user_id=user_id
         )
         
-        # ✅ ІСПРАВЛЕНО: Використовуємо константи ChatMemberStatus для надійної перевірки
+        # ✅ ВИПРАВЛЕННЯ БАГА: Використовуємо константи ChatMemberStatus
         is_member = chat_member.status in [
             ChatMemberStatus.MEMBER, 
             ChatMemberStatus.ADMINISTRATOR, 
-            ChatMemberStatus.OWNER
+            ChatMemberStatus.OWNER,
+            # Також враховуємо 'creator' як 'OWNER'
         ]
 
         if not is_member:
             await update.message.reply_text(
-                "тільки для членів клубу 👑", # Додав емодзі для стилю
+                "тільки для членів клубу 👑", 
                 reply_markup=reply_markup
             )
             return False
             
     except Exception as e:
+        # Якщо тут виникає помилка (наприклад, Forbidden: bot is not an administrator), 
+        # це означає, що бот не має прав для перевірки підписки.
         print(f"Помилка перевірки підписки для користувача {user_id}: {e}")
-        # Якщо бот не є адміністратором у цільовому каналі/чаті, він не зможе перевірити підписку.
-        # У цьому випадку повертаємо False.
         await update.message.reply_text("не можу перевірити підписку ⚠️") 
         return False
     
@@ -138,24 +136,22 @@ async def handle_gemini_message_group(update: Update, context: ContextTypes.DEFA
     if not update.message: 
         return
 
-    # ✅ ВИПРАВЛЕНО: Додана перевірка на наявність ключового слова на початку,
-    # що дозволяє уникнути непотрібних перевірок ID чату та підписки.
+    # Перевіряємо, чи є ключове слово "ало".
     if update.message.text is None or "ало" not in update.message.text.lower():
         return
 
     current_chat_id_str = str(update.effective_chat.id)
     
-    # Якщо повідомлення прийшло з цільового чату (форуму), пропускаємо перевірку підписки
+    # 1. Якщо повідомлення прийшло з цільового чату (форуму), пропускаємо перевірку підписки
     if TELEGRAM_CHAT_ID_STR and current_chat_id_str == TELEGRAM_CHAT_ID_STR:
         is_subscribed = True
     else:
-        # В усіх інших чатах перевіряємо підписку на цільовий чат
+        # 2. В усіх інших чатах перевіряємо підписку на цільовий чат
         is_subscribed = await _check_and_reply_subscription(update, context)
 
     if not is_subscribed:
         return
 
-    # Тут update.message.text вже перевірено на не-None вище
     await update.message.reply_chat_action("typing")
     user_text = update.message.text
     
