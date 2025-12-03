@@ -2,13 +2,13 @@ import os
 import time
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Chat
 from telegram.ext import ContextTypes
+# ✅ ДОДАНО: Необхідні імпорти для PTB 22.5 та логування
 from telegram.constants import ChatMemberStatus 
 from telegram.error import Forbidden, BadRequest
+import logging 
 from dotenv import load_dotenv
 import google.generativeai as genai
 from google.api_core.exceptions import GoogleAPICallError 
-import logging
-import asyncio 
 
 load_dotenv()
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
@@ -20,9 +20,6 @@ TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 MODEL_NAME = "gemini-2.5-flash" 
 FORUM_INVITE_LINK = "https://t.me/+7Xmj6pPB0mEyMDky" 
 FORUM_BUTTON_TEXT = "☇ ꜰ ☻‌ ʀ ᴜ ʍ❓" 
-# ✅ КОНСТАНТИ ДЛЯ ПОВТОРУ
-RETRY_ATTEMPTS = 2
-RETRY_DELAY = 1.0 # Затримка в 1 секунду
 
 # Налаштування логування
 logging.basicConfig(level=logging.INFO)
@@ -90,8 +87,7 @@ async def _get_gemini_response(user_text):
 
 async def _check_and_reply_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """
-    Проверяет, является ли пользователь участником целевого чата, используя механизм повтора.
-    Эта функция используется ТОЛЬКО для личных сообщений.
+    Проверяет, является ли пользователь участником целевого чата (используется только для личных сообщений).
     """
     if not TELEGRAM_CHAT_ID:
         return True
@@ -100,7 +96,7 @@ async def _check_and_reply_subscription(update: Update, context: ContextTypes.DE
     
     if not cleaned_chat_id:
         logger.error("TELEGRAM_CHAT_ID містить лише пробіли або відсутній після очищення.")
-        await update.message.reply_text("не можу перевірити підписку 💔")
+        await update.message.reply_text("не можу перевірити підписку 💔: ID чату порожній.")
         return False 
 
     user_id = update.effective_user.id
@@ -108,59 +104,48 @@ async def _check_and_reply_subscription(update: Update, context: ContextTypes.DE
     keyboard = [[InlineKeyboardButton(FORUM_BUTTON_TEXT, url=FORUM_INVITE_LINK)]] 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # ✅ БЛОК ПОВТОРУ
-    for attempt in range(RETRY_ATTEMPTS):
-        try:
-            chat_member = await context.bot.get_chat_member(
-                chat_id=cleaned_chat_id, # Використовуємо очищений ID
-                user_id=user_id
+    try:
+        chat_member = await context.bot.get_chat_member(
+            chat_id=cleaned_chat_id, 
+            user_id=user_id
+        )
+        
+        # Логіка, яка виключає лише LEFT та KICKED (використовує ChatMemberStatus)
+        is_member = chat_member.status not in [
+            ChatMemberStatus.LEFT, 
+            ChatMemberStatus.KICKED
+        ]
+
+        if not is_member:
+            await update.message.reply_text(
+                "тільки для членів клубу 👑",
+                reply_markup=reply_markup
             )
-            
-            # Якщо успіх, перевіряємо статус
-            is_member = chat_member.status not in [
-                ChatMemberStatus.LEFT, 
-                ChatMemberStatus.KICKED
-            ]
-
-            if not is_member:
-                # Отправка сообщения о не-подписке, если статус получен
-                await update.message.reply_text(
-                    "тільки для членів клубу 👑",
-                    reply_markup=reply_markup
-                )
-            
-            return is_member # Возвращаем результат проверки статуса
-            
-        except Forbidden as e:
-            logger.error(f"Помилка Forbidden (Спроба {attempt + 1}): Бот не може отримати інформацію про членство в чаті {cleaned_chat_id}. Перевір, чи є бот адміністратором. Помилка: {e}")
-            if attempt < RETRY_ATTEMPTS - 1:
-                await asyncio.sleep(RETRY_DELAY) # Пауза перед повтором
-                continue
-            
-            # Фінальна помилка після всіх спроб
-            await update.message.reply_text(
-                "не можу перевірити підписку ⚠️"
-            ) 
             return False
             
-        except BadRequest as e:
-            logger.error(f"Помилка BadRequest (Спроба {attempt + 1}): Невірний TELEGRAM_CHAT_ID '{cleaned_chat_id}' або інші помилки. Помилка: {e}")
-            if attempt < RETRY_ATTEMPTS - 1:
-                await asyncio.sleep(RETRY_DELAY) # Пауза перед повтором
-                continue
-
-            # Фінальна помилка після всіх спроб
-            await update.message.reply_text(
-                "не можу перевірити підписку ⚠️
-            ) 
-            return False
-            
-        except Exception as e:
-            logger.error(f"Неизвестная ошибка проверки подписки: {e}")
-            await update.message.reply_text("не можу перевірити підписку 💔") 
-            return False
+    except Forbidden as e:
+        logger.error(f"Помилка Forbidden: Бот не може отримати інформацію про членство в чаті {cleaned_chat_id}. Перевір, чи є бот адміністратором. Помилка: {e}")
+        await update.message.reply_text(
+            "не можу перевірити підписку ⚠️\n"
+            "**Помилка доступу (Forbidden).** Перевір, чи є бот **адміністратором** у чаті з ID:\n"
+            f"`{cleaned_chat_id}`"
+        ) 
+        return False
+        
+    except BadRequest as e:
+        logger.error(f"Помилка BadRequest: Невірний TELEGRAM_CHAT_ID '{cleaned_chat_id}' або інші помилки. Помилка: {e}")
+        await update.message.reply_text(
+            "не можу перевірити підписку ⚠️\n"
+            "**Помилка запиту (BadRequest).** Перевір, чи вірний `TELEGRAM_CHAT_ID` в конфігурації. ID повинен починатися з `-100`."
+        ) 
+        return False
+        
+    except Exception as e:
+        logger.error(f"Неизвестная ошибка проверки подписки: {e}")
+        await update.message.reply_text("не можу перевірити підписку 💔") 
+        return False
     
-    return False
+    return True
 
 async def handle_gemini_message_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -174,12 +159,8 @@ async def handle_gemini_message_group(update: Update, context: ContextTypes.DEFA
     if update.message.text is None or "ало" not in update.message.text.lower():
         return
 
-    # ✅ ИЗМЕНЕНИЕ: Убрана вся логика проверки подписки. Бот отвечает, если сказано "ало".
-    is_subscribed = True 
-
-    if not is_subscribed:
-        return
-
+    # ✅ ИЗМЕНЕНИЕ: Проверка подписки полностью удалена для группы.
+    
     if not update.message.text:
         return
 
