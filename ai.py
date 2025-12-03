@@ -1,14 +1,14 @@
 import os
 import time
-# ✅ Видалено ChatMember, залишено Chat
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Chat
 from telegram.ext import ContextTypes
-# ✅ ДОДАНО: Імпорт статусів та помилок для коректної перевірки та діагностики
 from telegram.constants import ChatMemberStatus 
 from telegram.error import Forbidden, BadRequest
 from dotenv import load_dotenv
 import google.generativeai as genai
 from google.api_core.exceptions import GoogleAPICallError 
+# ✅ ДОДАНО: Імпорт логування для діагностики
+import logging
 
 load_dotenv()
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
@@ -21,15 +21,18 @@ MODEL_NAME = "gemini-2.5-flash"
 FORUM_INVITE_LINK = "https://t.me/+7Xmj6pPB0mEyMDky" 
 FORUM_BUTTON_TEXT = "☇ ꜰ ☻‌ ʀ ᴜ ʍ❓" 
 
+# Налаштування логування
+logger = logging.getLogger(__name__)
+
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 else:
-    print("Ошибка: GEMINI_API_KEY не найден в .env файле. Функциональность Gemini будет недоступна.")
+    logger.error("Ошибка: GEMINI_API_KEY не найден в .env файле. Функциональность Gemini будет недоступна.")
     
 if not TELEGRAM_CHAT_ID:
-    print("Ошибка: TELEGRAM_CHAT_ID не найден в .env файле. Проверка подписки для личных сообщений не будет работать.")
+    logger.warning("Ошибка: TELEGRAM_CHAT_ID не найден в .env файле. Проверка подписки для личных сообщений не будет работать.")
 
-# ✅ НОВЕ: Строкове представлення ID для коректного порівняння
+# ✅ Строкове представлення ID для коректного порівняння
 TELEGRAM_CHAT_ID_STR = str(TELEGRAM_CHAT_ID) if TELEGRAM_CHAT_ID else None
 
 last_request_time = 0
@@ -52,7 +55,7 @@ async def _get_gemini_response(user_text):
         return f"почекай трохи 🫩 відпочину {remaining_time}"
 
     if not GEMINI_API_KEY:
-        print("API ключ не настроен. Невозможно получить ответ.")
+        # Логування тут не потрібне, бо вже є вище
         return "у мене немає api ключа 🔑"
 
     try:
@@ -67,7 +70,7 @@ async def _get_gemini_response(user_text):
 
     except GoogleAPICallError as e:
         error_message = str(e)
-        print(f"Ошибка при работе с Gemini API: {error_message}")
+        logger.error(f"Ошибка при работе с Gemini API: {error_message}")
         if "401" in error_message or "Invalid API Key" in error_message:
             return "ой 😔, мій API ключ не дійсний"
         elif "429" in error_message or "Rate limit exceeded" in error_message:
@@ -78,7 +81,7 @@ async def _get_gemini_response(user_text):
             return f"не можу відповісти 🤯: {error_message[:50]}..." 
 
     except Exception as e:
-        print(f"Неизвестная ошибка: {e}")
+        logger.error(f"Неизвестная ошибка: {e}")
         return "щось зламалось 💔"
 
 
@@ -100,8 +103,7 @@ async def _check_and_reply_subscription(update: Update, context: ContextTypes.DE
             user_id=user_id
         )
         
-        # ✅ ФІНАЛЬНЕ ВИПРАВЛЕННЯ: Явно виключаємо лише 'LEFT' та 'KICKED'. 
-        # Будь-який інший статус (member, administrator, creator, restricted) вважається підпискою.
+        # Логіка, яка виключає лише LEFT та KICKED
         is_member = chat_member.status not in [
             ChatMemberStatus.LEFT, 
             ChatMemberStatus.KICKED
@@ -114,18 +116,27 @@ async def _check_and_reply_subscription(update: Update, context: ContextTypes.DE
             )
             return False
             
-    except (Forbidden, BadRequest) as e:
-        # Forbidden: Бот не админ в целевом чате (TELEGRAM_CHAT_ID) или его там нет.
-        # BadRequest: Неверный TELEGRAM_CHAT_ID или другие ошибки.
-        print(f"Помилка перевірки (Forbidden/BadRequest). Це часто означає, що ID чату невірний або бот не є адміністратором у ньому: {e}")
+    except Forbidden as e:
+        # Forbidden (403): Бот не має доступу до чату. Найчастіше – не адміністратор, або його там немає.
+        logger.error(f"Помилка Forbidden: Бот не може отримати інформацію про членство в чаті {TELEGRAM_CHAT_ID}. Перевір, чи є бот адміністратором. Помилка: {e}")
         await update.message.reply_text(
             "не можу перевірити підписку ⚠️\n"
-            "перевір TELEGRAM_CHAT_ID та права бота в ньому"
+            "**Помилка доступу (Forbidden).** Перевір, чи є бот **адміністратором** у чаті з ID:\n"
+            f"`{TELEGRAM_CHAT_ID}`"
+        ) 
+        return False
+        
+    except BadRequest as e:
+        # BadRequest (400): ID чату невірний або не існує.
+        logger.error(f"Помилка BadRequest: Невірний TELEGRAM_CHAT_ID '{TELEGRAM_CHAT_ID}' або інші помилки. Помилка: {e}")
+        await update.message.reply_text(
+            "не можу перевірити підписку ⚠️\n"
+            "**Помилка запиту (BadRequest).** Перевір, чи вірний `TELEGRAM_CHAT_ID` в конфігурації. ID повинен починатися з `-100`."
         ) 
         return False
         
     except Exception as e:
-        print(f"Неизвестная ошибка проверки подписки: {e}")
+        logger.error(f"Неизвестная ошибка проверки подписки: {e}")
         await update.message.reply_text("не можу перевірити підписку 💔") 
         return False
     
