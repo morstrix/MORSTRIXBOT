@@ -1,8 +1,9 @@
-# main.py — POLLING + HTTP + chat_join_request
+# main.py — WEBHOOK версия
 
 import os
-import asyncio
 import logging
+import hashlib
+import hmac
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
     ChatJoinRequestHandler, CallbackQueryHandler,
@@ -11,10 +12,11 @@ from telegram.ext import (
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
-from dotenv import load_dotenv
 from aiohttp import web
+import ssl
+import certifi
 
-# === Імпорти ===
+# === Импорты ===
 from ai import handle_gemini_message_group, handle_gemini_message_private
 from handlers import (
     handle_new_members, handle_join_request, handle_callback_query,
@@ -24,28 +26,23 @@ from handlers import (
 from safe import check_links
 
 # ========================================
-# ЛОГУВАННЯ
+# КОНФИГУРАЦИЯ
 # ========================================
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
-
-# ========================================
-# КОНФІГУРАЦІЯ
-# ========================================
-if os.getenv("RENDER") != "true":
-    load_dotenv()
-
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")  # Секретный токен для верификации
+WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")  # Ваш домен на Render
 PORT = int(os.environ.get("PORT", 8080))
 
-if not TOKEN:
-    raise ValueError("TELEGRAM_BOT_TOKEN не знайдено!")
+if not all([TOKEN, WEBHOOK_HOST]):
+    raise ValueError("Не все переменные окружения установлены!")
 
 # ========================================
-# /start
+# ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ
+# ========================================
+application = Application.builder().token(TOKEN).build()
+
+# ========================================
+# ОБРАБОТЧИКИ (как были)
 # ========================================
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("ПРАВИЛА", callback_data="show_rules")]]
@@ -60,9 +57,6 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode=ParseMode.MARKDOWN
     )
 
-# ========================================
-# РЕЄСТРАЦІЯ ОБРОБНИКІВ
-# ========================================
 def setup_handlers(app: Application):
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(ConversationHandler(
@@ -84,51 +78,83 @@ def setup_handlers(app: Application):
     app.add_handler(MessageHandler(link_filters & filters.ChatType.GROUPS, check_links))
 
 # ========================================
-# HTTP-сервер (для Render)
+# WEBHOOK ЭНДПОИНТЫ
 # ========================================
+async def handle_webhook(request):
+    """Основной обработчик вебхука"""
+    # Верификация секретного токена (опционально, но рекомендуется)
+    if WEBHOOK_SECRET:
+        secret_header = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
+        if not hmac.compare_digest(secret_header or "", WEBHOOK_SECRET):
+            return web.Response(status=403, text="Forbidden")
+    
+    try:
+        data = await request.json()
+        update = Update.de_json(data, application.bot)
+        await application.update_queue.put(update)
+        return web.Response(text="OK")
+    except Exception as e:
+        logging.error(f"Ошибка обработки вебхука: {e}")
+        return web.Response(status=500, text="Internal Server Error")
+
 async def health_check(request):
-    """Ендпоінт для перевірки здоров'я бота (Health Check)"""
+    """Health check для Render"""
     return web.Response(text="MORSTRIX BOT IS ALIVE", status=200)
 
-async def start_http_server():
-    """Запуск легкого HTTP-сервера для запобігання 'засинанню' на Render."""
-    app = web.Application()
-    app.router.add_get('/', health_check)
-    app.router.add_get('/health', health_check)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    # Bind to 0.0.0.0 is crucial for Render
-    site = web.TCPSite(runner, '0.0.0.0', PORT) 
-    await site.start()
-    logger.info(f"HTTP-сервер запущено на порту {PORT}")
+async def setup_webhook():
+    """Установка вебхука"""
+    webhook_url = f"{WEBHOOK_HOST}/webhook"
+    
+    # Установка секретного токена для вебхука
+    await application.bot.set_webhook(
+        url=webhook_url,
+        secret_token=WEBHOOK_SECRET,
+        allowed_updates=[
+            "message", "callback_query", "chat_join_request",
+            "my_chat_member", "chat_member", "web_app_data"
+        ]
+    )
+    
+    logging.info(f"Webhook установлен на {webhook_url}")
 
 # ========================================
 # ЗАПУСК
 # ========================================
-def main():
-    if os.getenv("RENDER") == "true":
-        logger.info("=== RENDER: POLLING + HTTP HEALTH CHECK ===")
-        
-        # Запускаємо HTTP-сервер у фоні
-        loop = asyncio.get_event_loop()
-        loop.create_task(start_http_server())
-        
-        # Запускаємо polling у головному потоці
-        app = Application.builder().token(TOKEN).build()
-        setup_handlers(app)
-        
-        app.run_polling(
-            # drop_pending_updates за замовчуванням True, що ідеально
-            allowed_updates=[
-                "message", "callback_query", "chat_join_request",
-                "my_chat_member", "chat_member", "web_app_data"
-            ]
-        )
-    else:
-        logger.info("=== LOCAL: POLLING ===")
-        app = Application.builder().token(TOKEN).build()
-        setup_handlers(app)
-        app.run_polling()
-        
+async def main():
+    # Настройка обработчиков
+    setup_handlers(application)
+    
+    # Инициализация приложения
+    await application.initialize()
+    
+    # Установка вебхука
+    await setup_webhook()
+    
+    # Создание aiohttp приложения
+    app = web.Application()
+    app.router.add_post("/webhook", handle_webhook)
+    app.router.add_get("/", health_check)
+    app.router.add_get("/health", health_check)
+    
+    # Запуск сервера
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", PORT)
+    await site.start()
+    
+    logging.info(f"Сервер запущен на порту {PORT}")
+    
+    # Бесконечный цикл
+    await asyncio.Event().wait()
+
 if __name__ == "__main__":
-    main()
+    import asyncio
+    logging.basicConfig(
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        level=logging.INFO
+    )
+    
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logging.info("Бот остановлен")
