@@ -1,7 +1,10 @@
+# safe.py - исправленная версия
 import os
 import requests
-from telegram import Update, ReactionTypeEmoji
+from telegram import Update
 from telegram.ext import ContextTypes
+from telegram.constants import ReactionEmoji  # ИЗМЕНИЛОСЬ!
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -42,18 +45,16 @@ async def check_links(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data = response.json()
 
         if 'matches' in data:
-            # Реакція на небезпечне посилання (повідомлення не видаляється)
-            await context.bot.set_message_reaction(
-                chat_id=update.effective_chat.id,
-                message_id=update.message.message_id,
-                reaction=[ReactionTypeEmoji("🤬")]
+            # Реакція на небезпечне посилання
+            await update.message.set_reaction(
+                reaction=[ReactionEmoji(emoji="🤬")],  # ИЗМЕНИЛОСЬ!
+                is_big=False
             )
         else:
             # Реакція на безпечне посилання
-            await context.bot.set_message_reaction(
-                chat_id=update.effective_chat.id,
-                message_id=update.message.message_id,
-                reaction=[ReactionTypeEmoji("⚡️")]
+            await update.message.set_reaction(
+                reaction=[ReactionEmoji(emoji="⚡")],  # ИЗМЕНИЛОСЬ!
+                is_big=False
             )
     except requests.exceptions.RequestException as e:
         print(f"Помилка при зверненні до Google Safe Browsing API: {e}")
