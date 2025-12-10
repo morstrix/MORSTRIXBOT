@@ -3,7 +3,7 @@ import os
 import requests
 from telegram import Update
 from telegram.ext import ContextTypes
-from telegram.constants import ReactionEmoji  # ИЗМЕНИЛОСЬ!
+from telegram.constants import ReactionEmoji  # ✅ ПРАВИЛЬНЫЙ ИМПОРТ
 
 from dotenv import load_dotenv
 
@@ -13,9 +13,8 @@ GOOGLE_SAFE_BROWSING_URL = 'https://safebrowsing.googleapis.com/v4/threatMatches
 
 
 async def check_links(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Перевіряє посилання у повідомленні через Google Safe Browsing API."""
+    """Проверяет ссылки через Google Safe Browsing API."""
     if not GOOGLE_SAFE_BROWSING_API_KEY:
-        print("Помилка: GOOGLE_SAFE_BROWSING_API_KEY не знайдено.")
         return
 
     urls = []
@@ -30,7 +29,7 @@ async def check_links(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     payload = {
-        "client": {"clientId": "your-telegram-bot", "clientVersion": "1.0.0"},
+        "client": {"clientId": "telegram-bot", "clientVersion": "1.0.0"},
         "threatInfo": {
             "threatTypes": ["MALWARE", "SOCIAL_ENGINEERING", "UNWANTED_SOFTWARE", "POTENTIALLY_HARMFUL_APPLICATION"],
             "platformTypes": ["ANY_PLATFORM"],
@@ -45,16 +44,16 @@ async def check_links(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data = response.json()
 
         if 'matches' in data:
-            # Реакція на небезпечне посилання
+            # Опасная ссылка
             await update.message.set_reaction(
-                reaction=[ReactionEmoji(emoji="🤬")],  # ИЗМЕНИЛОСЬ!
+                reaction=[ReactionEmoji(emoji="🤬")],
                 is_big=False
             )
         else:
-            # Реакція на безпечне посилання
+            # Безопасная ссылка
             await update.message.set_reaction(
-                reaction=[ReactionEmoji(emoji="⚡")],  # ИЗМЕНИЛОСЬ!
+                reaction=[ReactionEmoji(emoji="⚡")],
                 is_big=False
             )
-    except requests.exceptions.RequestException as e:
-        print(f"Помилка при зверненні до Google Safe Browsing API: {e}")
+    except Exception as e:
+        print(f"Ошибка проверки ссылок: {e}")
