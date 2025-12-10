@@ -2,8 +2,8 @@
 import os
 import sys
 import asyncio
-import threading
 import logging
+import threading
 from flask import Flask, Response
 
 # Настройка логирования
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # WEB SERVER FOR KOYEB HEALTH CHECKS
 # ========================================
 def run_flask_server():
-    """Запускает Flask сервер в отдельном процессе"""
+    """Запускает Flask сервер для health checks"""
     app = Flask(__name__)
     
     @app.route('/')
@@ -27,238 +27,233 @@ def run_flask_server():
         return "✅ Бот работает", 200
     
     port = int(os.getenv('PORT', 8080))
-    # Отключаем reloader для production
-    app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
+    app.run(host='0.0.0.0', port=port, debug=False, threaded=True, use_reloader=False)
 
 # ========================================
-# TELEGRAM BOT (РАБОТАЕТ В ОТДЕЛЬНОМ EVENT LOOP)
+# TELEGRAM BOT - ПОЛНЫЙ ФУНКЦИОНАЛ
 # ========================================
-def run_telegram_bot():
-    """Запускает Telegram бота в отдельном потоке с собственным event loop"""
-    
-    async def bot_main():
-        """Асинхронная функция для бота"""
-        try:
-            # Импорты внутри функции
-            from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-            from telegram.ext import (
-                Application, CommandHandler, MessageHandler, filters,
-                ChatJoinRequestHandler, CallbackQueryHandler,
-                ContextTypes
+async def run_telegram_bot():
+    """Запускает Telegram бота со ВСЕМ функционалом"""
+    try:
+        # Импортируем ВСЕ модули
+        from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+        from telegram.ext import (
+            Application, CommandHandler, MessageHandler, filters,
+            ChatJoinRequestHandler, CallbackQueryHandler,
+            ContextTypes
+        )
+        from telegram.constants import ParseMode
+        import google.generativeai as genai
+        
+        # Импортируем твои модули
+        from ai import handle_gemini_message_private, handle_gemini_message_group
+        from safe import check_links
+        from handlers import (
+            handle_web_app_data, handle_join_request, 
+            handle_new_members, handle_callback_query,
+            font_start, font_get_text, font_cancel
+        )
+        from font_utils import convert_text_to_font
+        
+        TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+        GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+        
+        if not TOKEN:
+            logger.error("❌ TELEGRAM_BOT_TOKEN не найден!")
+            return
+        
+        logger.info("🚀 Инициализация Telegram бота...")
+        
+        if GEMINI_API_KEY:
+            genai.configure(api_key=GEMINI_API_KEY)
+        
+        # ========================================
+        # ВСЕ КОМАНДЫ БОТА
+        # ========================================
+        async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """Обработчик команды /start"""
+            keyboard = [[InlineKeyboardButton("ПРАВИЛА", callback_data="show_rules")]]
+            await update.message.reply_text(
+                "ᴡᴇʟᴄᴏᴍᴇ \n\n"
+                "➞ ᴀʙᴛᴏᴘᴘийᴏᴍ зᴀяʙᴏᴋ\n"
+                "➞ пᴇᴘᴇʙіᴘᴋᴀ пᴏᴄиʌᴀнь\n"
+                "➞ /font - ᴛᴇᴋᴄᴛ ᴄᴛᴀйʌᴇᴘ\n\n"
+                "➞ ШІ — дʌя чʌᴇніʙ ᴋʌубу (ᴀʌᴏ)\n"
+                "➞ ᴘᴀɪɴᴛ ᴀᴘᴘ (ᴘʀᴏᴛᴏᴛʏᴘᴇ)\n"
+                "➞ /tetris - играть в тетрис",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode=ParseMode.MARKDOWN
             )
-            from telegram.constants import ParseMode
-            import google.generativeai as genai
+        
+        async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            await update.message.reply_text(
+                "Доступные команды:\n"
+                "/start - начало работы\n"
+                "/font - стильный текст\n"
+                "/tetris - играть в тетрис\n"
+                "/help - эта справка\n\n"
+                "Бот также:\n"
+                "• Отвечает на 'ало' в группах\n"
+                "• Проверяет ссылки на безопасность\n"
+                "• Обрабатывает заявки в группы"
+            )
+        
+        async def tetris_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """Команда /tetris"""
+            await update.message.reply_text(
+                "🎮 TETRIS Game\n\n"
+                "Игра доступна по ссылке:\n"
+                "https://grimexframe.github.io/MORSTRXBOT/tetris.html\n\n"
+                "Или используй Web App если настроено.",
+                parse_mode=ParseMode.MARKDOWN
+            )
+        
+        # ========================================
+        # ОБРАБОТЧИКИ ИЗ ТВОИХ МОДУЛЕЙ
+        # ========================================
+        
+        # AI обработчики
+        async def handle_ai_private_wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            await handle_gemini_message_private(update, context)
+        
+        async def handle_ai_group_wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            await handle_gemini_message_group(update, context)
+        
+        # Safe links проверка
+        async def check_links_wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            await check_links(update, context)
+        
+        # Web app данные
+        async def handle_web_app_wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            await handle_web_app_data(update, context)
+        
+        # Join request
+        async def handle_join_request_wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            await handle_join_request(update, context)
+        
+        # New members
+        async def handle_new_members_wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            await handle_new_members(update, context)
+        
+        # Callback queries
+        async def handle_callback_wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            await handle_callback_query(update, context)
+        
+        # ========================================
+        # НАСТРОЙКА И ЗАПУСК БОТА
+        # ========================================
+        application = Application.builder().token(TOKEN).build()
+        
+        # Добавляем обработчики команд
+        application.add_handler(CommandHandler("start", start_command))
+        application.add_handler(CommandHandler("help", help_command))
+        application.add_handler(CommandHandler("tetris", tetris_command))
+        
+        # FONT команда (если есть ConversationHandler)
+        try:
+            from handlers import FONT_TEXT
+            from telegram.ext import ConversationHandler
             
-            # Переменные окружения
-            TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-            GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-            
-            if not TOKEN:
-                logger.error("❌ TELEGRAM_BOT_TOKEN не найден!")
-                return
-            
-            logger.info("🚀 Инициализация Telegram бота...")
-            
-            # Настройка Gemini
-            if GEMINI_API_KEY:
-                genai.configure(api_key=GEMINI_API_KEY)
-            
-            # ========================================
-            # GEMINI AI ФУНКЦИИ
-            # ========================================
-            async def get_gemini_response(user_text: str) -> str:
-                if not GEMINI_API_KEY:
-                    return "API ключ не настроен 🔑"
-                
-                try:
-                    model = genai.GenerativeModel("gemini-2.0-flash")
-                    response = model.generate_content(
-                        f"Отвечай коротко и по делу. Используй украинский язык. Без markdown. Вопрос: {user_text}"
-                    )
-                    return response.text if response.text else "Не получил ответ от AI 🤔"
-                except Exception as e:
-                    logger.error(f"Ошибка Gemini: {e}")
-                    return f"Ошибка AI"
-            
-            # ========================================
-            # КОМАНДЫ БОТА
-            # ========================================
-            async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-                keyboard = [[InlineKeyboardButton("ПРАВИЛА", callback_data="show_rules")]]
-                await update.message.reply_text(
-                    "ᴡᴇʟᴄᴏᴍᴇ \n\n"
-                    "➞ ᴀʙᴛᴏᴘᴘийᴏᴍ зᴀяʙᴏᴋ\n"
-                    "➞ пᴇᴘᴇʙіᴘᴋᴀ пᴏᴄиʌᴀнь\n"
-                    "➞ /font - ᴛᴇᴋᴄᴛ ᴄᴛᴀйʌᴇᴘ\n\n"
-                    "➞ ШІ — дʌя чʌᴇніʙ ᴋʌубу (ᴀʌᴏ)\n"
-                    "➞ ᴘᴀɪɴᴛ ᴀᴘᴘ (ᴘʀᴏᴛᴏᴛʏᴘᴇ)",
-                    reply_markup=InlineKeyboardMarkup(keyboard),
-                    parse_mode=ParseMode.MARKDOWN
-                )
-            
-            async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-                await update.message.reply_text(
-                    "Доступные команды:\n"
-                    "/start - начало работы\n"
-                    "/font - стильный текст\n"
-                    "/help - эта справка\n\n"
-                    "В чатах бот реагирует на 'ало'"
-                )
-            
-            # ========================================
-            # FONT КОМАНДА
-            # ========================================
-            FONT_MAP = {
-                'А': 'ᴀ', 'а': 'ᴀ', 'В': 'в', 'в': 'ʙ', 'Е': 'ᴇ', 'е': 'ᴇ',
-                'К': 'ᴋ', 'к': 'ᴋ', 'М': 'ᴍ', 'м': 'ᴍ', 'О': 'ᴏ', 'о': 'ᴏ',
-                'Р': 'ᴘ', 'р': 'ᴘ', 'С': 'ᴄ', 'с': 'ᴄ', 'Т': 'т', 'т': 'ᴛ',
-            }
-            
-            async def font_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            font_conv_handler = ConversationHandler(
+                entry_points=[CommandHandler("font", font_start)],
+                states={
+                    FONT_TEXT: [MessageHandler(filters.TEXT & ~filters.COMMAND, font_get_text)]
+                },
+                fallbacks=[CommandHandler("cancel", font_cancel)]
+            )
+            application.add_handler(font_conv_handler)
+        except:
+            # Упрощенная версия font команды
+            async def simple_font_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if not context.args:
                     await update.message.reply_text("Использование: /font <текст>")
                     return
                 
                 text = ' '.join(context.args)
-                if len(text) > 100:
-                    await update.message.reply_text("Текст слишком длинный (макс 100 символов)")
+                if len(text) > 500:
+                    await update.message.reply_text("Текст слишком длинный (макс 500 символов)")
                     return
                 
-                converted = ''.join([FONT_MAP.get(char, char) for char in text])
-                await update.message.reply_text(f"```\n{converted}\n```", parse_mode=ParseMode.MARKDOWN_V2)
+                converted = convert_text_to_font(text)
+                await update.message.reply_text(converted, parse_mode=ParseMode.MARKDOWN_V2)
             
-            # ========================================
-            # ОБРАБОТЧИКИ СООБЩЕНИЙ
-            # ========================================
-            async def handle_message_private(update: Update, context: ContextTypes.DEFAULT_TYPE):
-                if not update.message or not update.message.text:
-                    return
-                
-                user_text = update.message.text
-                
-                if user_text.startswith('/'):
-                    return
-                
-                await update.message.reply_chat_action("typing")
-                reply = await get_gemini_response(user_text)
-                await update.message.reply_text(reply)
+            application.add_handler(CommandHandler("font", simple_font_command))
+        
+        # Добавляем остальные обработчики
+        application.add_handler(CallbackQueryHandler(handle_callback_wrapper))
+        application.add_handler(ChatJoinRequestHandler(handle_join_request_wrapper))
+        
+        # Обработчики сообщений
+        application.add_handler(MessageHandler(
+            filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE,
+            handle_ai_private_wrapper
+        ))
+        
+        application.add_handler(MessageHandler(
+            filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS & filters.Regex(r'(?i)ало'),
+            handle_ai_group_wrapper
+        ))
+        
+        application.add_handler(MessageHandler(
+            filters.StatusUpdate.NEW_CHAT_MEMBERS,
+            handle_new_members_wrapper
+        ))
+        
+        # Проверка ссылок (для всех сообщений с ссылками)
+        application.add_handler(MessageHandler(
+            filters.TEXT & filters.Entity("url"),
+            check_links_wrapper
+        ))
+        
+        # Web app данные
+        application.add_handler(MessageHandler(
+            filters.StatusUpdate.WEB_APP_DATA,
+            handle_web_app_wrapper
+        ))
+        
+        # ========================================
+        # ЗАПУСК БОТА
+        # ========================================
+        logger.info("✅ Telegram бот запущен в режиме polling...")
+        
+        # Запускаем бота (без signal handlers)
+        await application.initialize()
+        await application.start()
+        await application.updater.start_polling(
+            poll_interval=0.5,
+            timeout=30,
+            drop_pending_updates=True,
+            allowed_updates=Update.ALL_TYPES
+        )
+        
+        # Бесконечный цикл
+        while True:
+            await asyncio.sleep(3600)
             
-            async def handle_message_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
-                if not update.message or not update.message.text:
-                    return
-                
-                text = update.message.text.lower()
-                if 'ало' in text:
-                    await update.message.reply_chat_action("typing")
-                    reply = await get_gemini_response(update.message.text)
-                    await update.message.reply_text(
-                        reply,
-                        message_thread_id=update.message.message_thread_id
-                    )
-            
-            async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-                query = update.callback_query
-                await query.answer()
-                
-                if query.data == "show_rules":
-                    await query.edit_message_text(
-                        "ᴋᴏᴘиᴄᴛуйᴄя ᴛᴘигᴇᴏᴍ ᴀʌᴏ",
-                        parse_mode=ParseMode.MARKDOWN
-                    )
-            
-            async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
-                try:
-                    join_req = update.chat_join_request
-                    chat_id = join_req.chat.id
-                    user_id = join_req.from_user.id
-                    
-                    await context.bot.approve_chat_join_request(
-                        chat_id=chat_id, 
-                        user_id=user_id
-                    )
-                    logger.info(f"✅ Заявка одобрена: {user_id}")
-                    
-                except Exception as e:
-                    logger.error(f"Ошибка обработки заявки: {e}")
-            
-            async def handle_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
-                for member in update.message.new_chat_members:
-                    if not member.is_bot:
-                        keyboard = [[InlineKeyboardButton("пᴘᴀʙиʌᴀ", callback_data="show_rules")]]
-                        reply_markup = InlineKeyboardMarkup(keyboard)
-                        
-                        welcome = f"ᴀйо {member.full_name}!\nᴏзнᴀйᴏᴍᴛᴇᴄя з пᴘᴀʙиʌᴀᴍи."
-                        thread_id = update.message.message_thread_id if update.message.is_topic_message else None
-                        await update.message.reply_text(
-                            welcome, 
-                            reply_markup=reply_markup, 
-                            message_thread_id=thread_id
-                        )
-            
-            # ========================================
-            # НАСТРОЙКА И ЗАПУСК БОТА
-            # ========================================
-            application = Application.builder().token(TOKEN).build()
-            
-            # Добавляем обработчики
-            application.add_handler(CommandHandler("start", start_command))
-            application.add_handler(CommandHandler("help", help_command))
-            application.add_handler(CommandHandler("font", font_command))
-            
-            application.add_handler(CallbackQueryHandler(handle_callback))
-            application.add_handler(ChatJoinRequestHandler(handle_join_request))
-            
-            application.add_handler(MessageHandler(
-                filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE,
-                handle_message_private
-            ))
-            
-            application.add_handler(MessageHandler(
-                filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS & filters.Regex(r'(?i)ало'),
-                handle_message_group
-            ))
-            
-            application.add_handler(MessageHandler(
-                filters.StatusUpdate.NEW_CHAT_MEMBERS,
-                handle_new_members
-            ))
-            
-            # Запускаем бота
-            logger.info("✅ Telegram бот запущен в режиме polling...")
-            await application.run_polling(
-                poll_interval=0.5,
-                timeout=30,
-                drop_pending_updates=True,
-                allowed_updates=Update.ALL_TYPES
-            )
-            
-        except Exception as e:
-            logger.error(f"❌ Ошибка в Telegram боте: {e}")
-            import traceback
-            traceback.print_exc()
-    
-    # Создаем новый event loop для бота
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        loop.run_until_complete(bot_main())
-    finally:
-        loop.close()
+    except Exception as e:
+        logger.error(f"❌ Ошибка в Telegram боте: {e}")
+        import traceback
+        traceback.print_exc()
 
 # ========================================
-# ГЛАВНАЯ ФУНКЦИЯ
+# ГЛАВНАЯ ФУНКЦИЯ ЗАПУСКА
 # ========================================
 def main():
-    """Основная функция запуска"""
+    """Запускает Flask и Telegram бота"""
     logger.info("🚀 MORSTRIXBOT запускается на Koyeb...")
     
-    # Запускаем Telegram бота в отдельном потоке
-    bot_thread = threading.Thread(target=run_telegram_bot, daemon=True)
-    bot_thread.start()
-    logger.info("✅ Telegram бот запущен в отдельном потоке")
+    # Запускаем Flask в отдельном потоке
+    flask_thread = threading.Thread(target=run_flask_server, daemon=True)
+    flask_thread.start()
+    logger.info("✅ Flask сервер запущен на порту 8080")
     
-    # Запускаем Flask сервер в основном потоке (блокирующий)
-    run_flask_server()
+    # Запускаем Telegram бота
+    try:
+        asyncio.run(run_telegram_bot())
+    except KeyboardInterrupt:
+        logger.info("⏹ Бот остановлен")
+    except Exception as e:
+        logger.error(f"💀 Фатальная ошибка: {e}")
 
 if __name__ == "__main__":
     main()
