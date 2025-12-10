@@ -1,160 +1,282 @@
-# main.py — WEBHOOK версия
-
+#!/usr/bin/env python3
 import os
+import sys
+import asyncio
+import threading
+import signal
+from flask import Flask, Response
 import logging
-import hashlib
-import hmac
-from telegram.ext import (
-    Application, CommandHandler, MessageHandler, filters,
-    ChatJoinRequestHandler, CallbackQueryHandler,
-    ConversationHandler
+
+# Настройка логирования
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO,
+    stream=sys.stdout
 )
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes
-from telegram.constants import ParseMode
-from aiohttp import web
-import ssl
-import certifi
-
-# === Импорты ===
-from ai import handle_gemini_message_group, handle_gemini_message_private
-from handlers import (
-    handle_new_members, handle_join_request, handle_callback_query,
-    font_start, font_get_text, font_cancel,
-    handle_web_app_data,
-)
-from safe import check_links
+logger = logging.getLogger(__name__)
 
 # ========================================
-# КОНФИГУРАЦИЯ
+# WEB SERVER FOR KOYEB HEALTH CHECKS
 # ========================================
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")  # Секретный токен для верификации
-WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")  # Ваш домен на Render
-PORT = int(os.environ.get("PORT", 8080))
-
-if not all([TOKEN, WEBHOOK_HOST]):
-    raise ValueError("Не все переменные окружения установлены!")
-
-# ========================================
-# ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ
-# ========================================
-application = Application.builder().token(TOKEN).build()
-
-# ========================================
-# ОБРАБОТЧИКИ (как были)
-# ========================================
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[InlineKeyboardButton("ПРАВИЛА", callback_data="show_rules")]]
-    await update.message.reply_text(
-        "ᴡᴇʟᴄᴏᴍᴇ \n\n"
-        "➞ ᴀʙᴛᴏᴘᴘийᴏᴍ зᴀяʙᴏᴋ\n"
-        "➞ пᴇᴘᴇʙіᴘᴋᴀ пᴏᴄиʌᴀнь\n"
-        "➞ /font - ᴛᴇᴋᴄᴛ ᴄᴛᴀйʌᴇᴘ\n\n"
-        "➞ ШІ — дʌя чʌᴇніʙ ᴋʌубу (ᴀʌᴏ)\n"
-        "➞ ᴘᴀɪɴᴛ ᴀᴘᴘ (ᴘʀᴏᴛᴏᴛʏᴘᴇ)",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode=ParseMode.MARKDOWN
-    )
-
-def setup_handlers(app: Application):
-    app.add_handler(CommandHandler("start", start_command))
-    app.add_handler(ConversationHandler(
-        entry_points=[CommandHandler("font", font_start)],
-        states={0: [MessageHandler(filters.TEXT & ~filters.COMMAND, font_get_text)]},
-        fallbacks=[CommandHandler("cancel", font_cancel)],
-        allow_reentry=True
-    ))
-    app.add_handler(CallbackQueryHandler(handle_callback_query))
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, handle_new_members))
-    app.add_handler(ChatJoinRequestHandler(handle_join_request))
-    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_web_app_data))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_gemini_message_private))
-    app.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND & filters.Regex(r'(?i)ало') & filters.ChatType.GROUPS,
-        handle_gemini_message_group
-    ))
-    link_filters = filters.Entity("url") | filters.Entity("text_link")
-    app.add_handler(MessageHandler(link_filters & filters.ChatType.GROUPS, check_links))
-
-# ========================================
-# WEBHOOK ЭНДПОИНТЫ
-# ========================================
-async def handle_webhook(request):
-    """Основной обработчик вебхука"""
-    # Верификация секретного токена (опционально, но рекомендуется)
-    if WEBHOOK_SECRET:
-        secret_header = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
-        if not hmac.compare_digest(secret_header or "", WEBHOOK_SECRET):
-            return web.Response(status=403, text="Forbidden")
+def run_flask_server():
+    """Запускает Flask сервер для health checks"""
+    app = Flask(__name__)
     
+    @app.route('/')
+    @app.route('/health')
+    def health():
+        return Response("✅ Бот работает", status=200, mimetype='text/plain')
+    
+    # Koyeb использует порт 8080 по умолчанию
+    port = int(os.getenv('PORT', 8080))
+    app.run(host='0.0.0.0', port=port, threaded=True)
+
+# ========================================
+# TELEGRAM BOT (ТВОЙ ОРИГИНАЛЬНЫЙ КОД)
+# ========================================
+async def run_telegram_bot():
+    """Запускает Telegram бота"""
     try:
-        data = await request.json()
-        update = Update.de_json(data, application.bot)
-        await application.update_queue.put(update)
-        return web.Response(text="OK")
+        # Импортируем здесь чтобы избежать конфликтов
+        from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+        from telegram.ext import (
+            Application, CommandHandler, MessageHandler, filters,
+            ChatJoinRequestHandler, CallbackQueryHandler,
+            ConversationHandler, ContextTypes
+        )
+        from telegram.constants import ParseMode
+        import google.generativeai as genai
+        
+        # Переменные окружения
+        TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+        GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+        
+        if not TOKEN:
+            logger.error("❌ TELEGRAM_BOT_TOKEN не найден!")
+            return
+        
+        logger.info("🚀 Инициализация Telegram бота...")
+        
+        # Настройка Gemini
+        if GEMINI_API_KEY:
+            genai.configure(api_key=GEMINI_API_KEY)
+        
+        # ========================================
+        # GEMINI AI ФУНКЦИИ
+        # ========================================
+        async def get_gemini_response(user_text: str) -> str:
+            """Получает ответ от Gemini"""
+            if not GEMINI_API_KEY:
+                return "API ключ не настроен 🔑"
+            
+            try:
+                model = genai.GenerativeModel("gemini-2.0-flash")
+                response = model.generate_content(
+                    f"Отвечай коротко и по делу. Используй украинский язык. Без markdown. Вопрос: {user_text}"
+                )
+                return response.text if response.text else "Не получил ответ от AI 🤔"
+            except Exception as e:
+                logger.error(f"Ошибка Gemini: {e}")
+                return f"Ошибка AI"
+        
+        # ========================================
+        # ОСНОВНЫЕ КОМАНДЫ БОТА
+        # ========================================
+        async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """Обработчик команды /start"""
+            keyboard = [[InlineKeyboardButton("ПРАВИЛА", callback_data="show_rules")]]
+            await update.message.reply_text(
+                "ᴡᴇʟᴄᴏᴍᴇ \n\n"
+                "➞ ᴀʙᴛᴏᴘᴘийᴏᴍ зᴀяʙᴏᴋ\n"
+                "➞ пᴇᴘᴇʙіᴘᴋᴀ пᴏᴄиʌᴀнь\n"
+                "➞ /font - ᴛᴇᴋᴄᴛ ᴄᴛᴀйʌᴇᴘ\n\n"
+                "➞ ШІ — дʌя чʌᴇніʙ ᴋʌубу (ᴀʌᴏ)\n"
+                "➞ ᴘᴀɪɴᴛ ᴀᴘᴘ (ᴘʀᴏᴛᴏᴛʏᴘᴇ)",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode=ParseMode.MARKDOWN
+            )
+        
+        async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            await update.message.reply_text(
+                "Доступные команды:\n"
+                "/start - начало работы\n"
+                "/font - стильный текст\n"
+                "/help - эта справка\n\n"
+                "В чатах бот реагирует на 'ало'"
+            )
+        
+        # ========================================
+        # FONT КОМАНДА
+        # ========================================
+        FONT_MAP = {
+            'А': 'ᴀ', 'а': 'ᴀ', 'В': 'в', 'в': 'ʙ', 'Е': 'ᴇ', 'е': 'ᴇ',
+            'К': 'ᴋ', 'к': 'ᴋ', 'М': 'ᴍ', 'м': 'ᴍ', 'О': 'ᴏ', 'о': 'ᴏ',
+            'Р': 'ᴘ', 'р': 'ᴘ', 'С': 'ᴄ', 'с': 'ᴄ', 'Т': 'т', 'т': 'ᴛ',
+            'Н': 'н', 'н': 'н', 'І': 'і', 'і': 'і', 'У': 'у', 'у': 'у',
+        }
+        
+        async def font_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """Обработчик команды /font"""
+            if not context.args:
+                await update.message.reply_text("Использование: /font <текст>")
+                return
+            
+            text = ' '.join(context.args)
+            if len(text) > 100:
+                await update.message.reply_text("Текст слишком длинный (макс 100 символов)")
+                return
+            
+            converted = ''.join([FONT_MAP.get(char, char) for char in text])
+            await update.message.reply_text(f"```\n{converted}\n```", parse_mode=ParseMode.MARKDOWN_V2)
+        
+        # ========================================
+        # ОБРАБОТЧИКИ СООБЩЕНИЙ
+        # ========================================
+        async def handle_message_private(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """Обработчик личных сообщений"""
+            if not update.message or not update.message.text:
+                return
+            
+            user_text = update.message.text
+            
+            # Игнорируем команды
+            if user_text.startswith('/'):
+                return
+            
+            await update.message.reply_chat_action("typing")
+            reply = await get_gemini_response(user_text)
+            await update.message.reply_text(reply)
+        
+        async def handle_message_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """Обработчик сообщений в группах"""
+            if not update.message or not update.message.text:
+                return
+            
+            text = update.message.text.lower()
+            if 'ало' in text:
+                await update.message.reply_chat_action("typing")
+                reply = await get_gemini_response(update.message.text)
+                await update.message.reply_text(
+                    reply,
+                    message_thread_id=update.message.message_thread_id
+                )
+        
+        # ========================================
+        # CALLBACK HANDLERS
+        # ========================================
+        async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """Обработчик callback кнопок"""
+            query = update.callback_query
+            await query.answer()
+            
+            if query.data == "show_rules":
+                await query.edit_message_text(
+                    "ᴋᴏᴘиᴄᴛуйᴄя ᴛᴘигᴇᴏᴍ ᴀʌᴏ",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+        
+        # ========================================
+        # JOIN REQUEST HANDLER
+        # ========================================
+        async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """Обработчик заявок на вступление"""
+            try:
+                join_req = update.chat_join_request
+                chat_id = join_req.chat.id
+                user_id = join_req.from_user.id
+                
+                # Одобряем заявку
+                await context.bot.approve_chat_join_request(
+                    chat_id=chat_id, 
+                    user_id=user_id
+                )
+                logger.info(f"✅ Заявка одобрена: {user_id}")
+                
+            except Exception as e:
+                logger.error(f"Ошибка обработки заявки: {e}")
+        
+        # ========================================
+        # NEW MEMBERS HANDLER
+        # ========================================
+        async def handle_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """Приветствие новых участников"""
+            for member in update.message.new_chat_members:
+                if not member.is_bot:
+                    keyboard = [[InlineKeyboardButton("пᴘᴀʙиʌᴀ", callback_data="show_rules")]]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    
+                    welcome = f"ᴀйо {member.full_name}!\nᴏзнᴀйᴏᴍᴛᴇᴄя з пᴘᴀʙиʌᴀᴍи."
+                    thread_id = update.message.message_thread_id if update.message.is_topic_message else None
+                    await update.message.reply_text(
+                        welcome, 
+                        reply_markup=reply_markup, 
+                        message_thread_id=thread_id
+                    )
+        
+        # ========================================
+        # НАСТРОЙКА И ЗАПУСК БОТА
+        # ========================================
+        application = Application.builder().token(TOKEN).build()
+        
+        # Добавляем обработчики
+        application.add_handler(CommandHandler("start", start_command))
+        application.add_handler(CommandHandler("help", help_command))
+        application.add_handler(CommandHandler("font", font_command))
+        
+        application.add_handler(CallbackQueryHandler(handle_callback))
+        application.add_handler(ChatJoinRequestHandler(handle_join_request))
+        
+        # Обработчики сообщений
+        application.add_handler(MessageHandler(
+            filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE,
+            handle_message_private
+        ))
+        
+        application.add_handler(MessageHandler(
+            filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS & filters.Regex(r'(?i)ало'),
+            handle_message_group
+        ))
+        
+        # Обработчик новых участников
+        application.add_handler(MessageHandler(
+            filters.StatusUpdate.NEW_CHAT_MEMBERS,
+            handle_new_members
+        ))
+        
+        # Запускаем бота
+        logger.info("✅ Telegram бот запущен в режиме polling...")
+        await application.run_polling(
+            poll_interval=0.5,
+            timeout=30,
+            drop_pending_updates=True,
+            allowed_updates=Update.ALL_TYPES
+        )
+        
     except Exception as e:
-        logging.error(f"Ошибка обработки вебхука: {e}")
-        return web.Response(status=500, text="Internal Server Error")
-
-async def health_check(request):
-    """Health check для Render"""
-    return web.Response(text="MORSTRIX BOT IS ALIVE", status=200)
-
-async def setup_webhook():
-    """Установка вебхука"""
-    webhook_url = f"{WEBHOOK_HOST}/webhook"
-    
-    # Установка секретного токена для вебхука
-    await application.bot.set_webhook(
-        url=webhook_url,
-        secret_token=WEBHOOK_SECRET,
-        allowed_updates=[
-            "message", "callback_query", "chat_join_request",
-            "my_chat_member", "chat_member", "web_app_data"
-        ]
-    )
-    
-    logging.info(f"Webhook установлен на {webhook_url}")
+        logger.error(f"❌ Ошибка в Telegram боте: {e}")
+        import traceback
+        traceback.print_exc()
 
 # ========================================
-# ЗАПУСК
+# ГЛАВНАЯ ФУНКЦИЯ
 # ========================================
-async def main():
-    # Настройка обработчиков
-    setup_handlers(application)
+def main():
+    """Основная функция запуска"""
+    logger.info("🚀 MORSTRIXBOT запускается на Koyeb...")
     
-    # Инициализация приложения
-    await application.initialize()
+    # Запускаем Flask сервер в отдельном потоке
+    flask_thread = threading.Thread(target=run_flask_server, daemon=True)
+    flask_thread.start()
+    logger.info("✅ Flask сервер запущен на порту 8080")
     
-    # Установка вебхука
-    await setup_webhook()
-    
-    # Создание aiohttp приложения
-    app = web.Application()
-    app.router.add_post("/webhook", handle_webhook)
-    app.router.add_get("/", health_check)
-    app.router.add_get("/health", health_check)
-    
-    # Запуск сервера
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", PORT)
-    await site.start()
-    
-    logging.info(f"Сервер запущен на порту {PORT}")
-    
-    # Бесконечный цикл
-    await asyncio.Event().wait()
+    # Запускаем Telegram бота
+    try:
+        asyncio.run(run_telegram_bot())
+    except KeyboardInterrupt:
+        logger.info("⏹ Бот остановлен")
+    except Exception as e:
+        logger.error(f"💀 Фатальная ошибка: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
-    import asyncio
-    logging.basicConfig(
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        level=logging.INFO
-    )
-    
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logging.info("Бот остановлен")
+    main()

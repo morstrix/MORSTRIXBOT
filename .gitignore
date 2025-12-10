@@ -1,2 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment
 .env
-weather_chats.txt
+*.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Secrets
+*.key
+*.pem
+*.crt
+config.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Render
+render.yaml
