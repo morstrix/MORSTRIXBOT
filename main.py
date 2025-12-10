@@ -27,22 +27,27 @@ def run_flask_server():
     def health():
         return Response("✅ Бот работает", status=200, mimetype='text/plain')
     
-    # Koyeb использует порт 8080 по умолчанию
+    # Используем Waitress для production
+    from waitress import serve
     port = int(os.getenv('PORT', 8080))
-    app.run(host='0.0.0.0', port=port, threaded=True)
+    serve(app, host='0.0.0.0', port=port)
 
 # ========================================
-# TELEGRAM BOT (ТВОЙ ОРИГИНАЛЬНЫЙ КОД)
+# TELEGRAM BOT
 # ========================================
 async def run_telegram_bot():
-    """Запускает Telegram бота"""
+    """Запускает Telegram бота в отдельном event loop"""
     try:
-        # Импортируем здесь чтобы избежать конфликтов
+        # Создаем новый event loop для бота
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        # Импорты внутри функции
         from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
         from telegram.ext import (
             Application, CommandHandler, MessageHandler, filters,
             ChatJoinRequestHandler, CallbackQueryHandler,
-            ConversationHandler, ContextTypes
+            ContextTypes
         )
         from telegram.constants import ParseMode
         import google.generativeai as genai
@@ -65,7 +70,6 @@ async def run_telegram_bot():
         # GEMINI AI ФУНКЦИИ
         # ========================================
         async def get_gemini_response(user_text: str) -> str:
-            """Получает ответ от Gemini"""
             if not GEMINI_API_KEY:
                 return "API ключ не настроен 🔑"
             
@@ -80,10 +84,9 @@ async def run_telegram_bot():
                 return f"Ошибка AI"
         
         # ========================================
-        # ОСНОВНЫЕ КОМАНДЫ БОТА
+        # КОМАНДЫ БОТА
         # ========================================
         async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            """Обработчик команды /start"""
             keyboard = [[InlineKeyboardButton("ПРАВИЛА", callback_data="show_rules")]]
             await update.message.reply_text(
                 "ᴡᴇʟᴄᴏᴍᴇ \n\n"
@@ -112,11 +115,9 @@ async def run_telegram_bot():
             'А': 'ᴀ', 'а': 'ᴀ', 'В': 'в', 'в': 'ʙ', 'Е': 'ᴇ', 'е': 'ᴇ',
             'К': 'ᴋ', 'к': 'ᴋ', 'М': 'ᴍ', 'м': 'ᴍ', 'О': 'ᴏ', 'о': 'ᴏ',
             'Р': 'ᴘ', 'р': 'ᴘ', 'С': 'ᴄ', 'с': 'ᴄ', 'Т': 'т', 'т': 'ᴛ',
-            'Н': 'н', 'н': 'н', 'І': 'і', 'і': 'і', 'У': 'у', 'у': 'у',
         }
         
         async def font_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            """Обработчик команды /font"""
             if not context.args:
                 await update.message.reply_text("Использование: /font <текст>")
                 return
@@ -133,13 +134,11 @@ async def run_telegram_bot():
         # ОБРАБОТЧИКИ СООБЩЕНИЙ
         # ========================================
         async def handle_message_private(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            """Обработчик личных сообщений"""
             if not update.message or not update.message.text:
                 return
             
             user_text = update.message.text
             
-            # Игнорируем команды
             if user_text.startswith('/'):
                 return
             
@@ -148,7 +147,6 @@ async def run_telegram_bot():
             await update.message.reply_text(reply)
         
         async def handle_message_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            """Обработчик сообщений в группах"""
             if not update.message or not update.message.text:
                 return
             
@@ -161,11 +159,7 @@ async def run_telegram_bot():
                     message_thread_id=update.message.message_thread_id
                 )
         
-        # ========================================
-        # CALLBACK HANDLERS
-        # ========================================
         async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            """Обработчик callback кнопок"""
             query = update.callback_query
             await query.answer()
             
@@ -175,17 +169,12 @@ async def run_telegram_bot():
                     parse_mode=ParseMode.MARKDOWN
                 )
         
-        # ========================================
-        # JOIN REQUEST HANDLER
-        # ========================================
         async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            """Обработчик заявок на вступление"""
             try:
                 join_req = update.chat_join_request
                 chat_id = join_req.chat.id
                 user_id = join_req.from_user.id
                 
-                # Одобряем заявку
                 await context.bot.approve_chat_join_request(
                     chat_id=chat_id, 
                     user_id=user_id
@@ -195,11 +184,7 @@ async def run_telegram_bot():
             except Exception as e:
                 logger.error(f"Ошибка обработки заявки: {e}")
         
-        # ========================================
-        # NEW MEMBERS HANDLER
-        # ========================================
         async def handle_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            """Приветствие новых участников"""
             for member in update.message.new_chat_members:
                 if not member.is_bot:
                     keyboard = [[InlineKeyboardButton("пᴘᴀʙиʌᴀ", callback_data="show_rules")]]
@@ -226,7 +211,6 @@ async def run_telegram_bot():
         application.add_handler(CallbackQueryHandler(handle_callback))
         application.add_handler(ChatJoinRequestHandler(handle_join_request))
         
-        # Обработчики сообщений
         application.add_handler(MessageHandler(
             filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE,
             handle_message_private
@@ -237,20 +221,25 @@ async def run_telegram_bot():
             handle_message_group
         ))
         
-        # Обработчик новых участников
         application.add_handler(MessageHandler(
             filters.StatusUpdate.NEW_CHAT_MEMBERS,
             handle_new_members
         ))
         
-        # Запускаем бота
+        # Запускаем бота с правильным event loop
         logger.info("✅ Telegram бот запущен в режиме polling...")
-        await application.run_polling(
+        
+        await application.initialize()
+        await application.start()
+        await application.updater.start_polling(
             poll_interval=0.5,
             timeout=30,
             drop_pending_updates=True,
             allowed_updates=Update.ALL_TYPES
         )
+        
+        # Ждем вечно (пока не будет сигнала остановки)
+        await asyncio.Event().wait()
         
     except Exception as e:
         logger.error(f"❌ Ошибка в Telegram боте: {e}")
@@ -269,14 +258,13 @@ def main():
     flask_thread.start()
     logger.info("✅ Flask сервер запущен на порту 8080")
     
-    # Запускаем Telegram бота
+    # Запускаем Telegram бота в основном потоке
     try:
         asyncio.run(run_telegram_bot())
     except KeyboardInterrupt:
         logger.info("⏹ Бот остановлен")
     except Exception as e:
         logger.error(f"💀 Фатальная ошибка: {e}")
-        sys.exit(1)
 
 if __name__ == "__main__":
     main()
