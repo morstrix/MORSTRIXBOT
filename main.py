@@ -3,9 +3,8 @@ import os
 import sys
 import asyncio
 import threading
-import signal
-from flask import Flask, Response
 import logging
+from flask import Flask, Response
 
 # Настройка логирования
 logging.basicConfig(
@@ -16,32 +15,27 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ========================================
-# WEB SERVER FOR KOYEB HEALTH CHECKS
+# WEB SERVER FOR KOYEB HEALTH CHECKS (УПРОЩЕННЫЙ)
 # ========================================
 def run_flask_server():
-    """Запускает Flask сервер для health checks"""
+    """Запускает простой Flask сервер для health checks"""
     app = Flask(__name__)
     
     @app.route('/')
     @app.route('/health')
     def health():
-        return Response("✅ Бот работает", status=200, mimetype='text/plain')
+        return "✅ Бот работает", 200
     
-    # Используем Waitress для production
-    from waitress import serve
+    # Используем стандартный Flask dev сервер, но с отключенным debug
     port = int(os.getenv('PORT', 8080))
-    serve(app, host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
 
 # ========================================
-# TELEGRAM BOT
+# TELEGRAM BOT (ОСТАВЛЯЕМ ТВОЙ КОД)
 # ========================================
 async def run_telegram_bot():
-    """Запускает Telegram бота в отдельном event loop"""
+    """Запускает Telegram бота"""
     try:
-        # Создаем новый event loop для бота
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
         # Импорты внутри функции
         from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
         from telegram.ext import (
@@ -84,7 +78,7 @@ async def run_telegram_bot():
                 return f"Ошибка AI"
         
         # ========================================
-        # КОМАНДЫ БОТА
+        # ОСНОВНЫЕ КОМАНДЫ БОТА
         # ========================================
         async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard = [[InlineKeyboardButton("ПРАВИЛА", callback_data="show_rules")]]
@@ -226,20 +220,14 @@ async def run_telegram_bot():
             handle_new_members
         ))
         
-        # Запускаем бота с правильным event loop
+        # Запускаем бота
         logger.info("✅ Telegram бот запущен в режиме polling...")
-        
-        await application.initialize()
-        await application.start()
-        await application.updater.start_polling(
+        await application.run_polling(
             poll_interval=0.5,
             timeout=30,
             drop_pending_updates=True,
             allowed_updates=Update.ALL_TYPES
         )
-        
-        # Ждем вечно (пока не будет сигнала остановки)
-        await asyncio.Event().wait()
         
     except Exception as e:
         logger.error(f"❌ Ошибка в Telegram боте: {e}")
@@ -258,7 +246,7 @@ def main():
     flask_thread.start()
     logger.info("✅ Flask сервер запущен на порту 8080")
     
-    # Запускаем Telegram бота в основном потоке
+    # Запускаем Telegram бота
     try:
         asyncio.run(run_telegram_bot())
     except KeyboardInterrupt:
