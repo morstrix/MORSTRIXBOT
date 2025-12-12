@@ -65,7 +65,6 @@ function calculateCanvasSize() {
     const maxWidth = gameArea.clientWidth - 20;
     const maxHeight = gameArea.clientHeight - 20;
     
-    // Рассчитываем размер блока
     const blockByWidth = Math.floor(maxWidth / COLS);
     const blockByHeight = Math.floor(maxHeight / ROWS);
     BLOCK_SIZE = Math.min(blockByWidth, blockByHeight);
@@ -238,19 +237,56 @@ function drawNextPiece() {
     });
 }
 
-function drawBlock(x, y, color) {
-    ctx.fillStyle = color;
-    ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+function drawBlock(x, y, color, isGhost = false) {
+    if (isGhost) {
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.25;
+        ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+        ctx.globalAlpha = 1.0;
+        
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x * BLOCK_SIZE + 1, y * BLOCK_SIZE + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2);
+    } else {
+        ctx.fillStyle = color;
+        ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+        
+        // Тень
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, 2);
+        ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, 2, BLOCK_SIZE);
+        
+        // Свет
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.fillRect(x * BLOCK_SIZE + BLOCK_SIZE - 2, y * BLOCK_SIZE + 2, 2, BLOCK_SIZE - 2);
+        ctx.fillRect(x * BLOCK_SIZE + 2, y * BLOCK_SIZE + BLOCK_SIZE - 2, BLOCK_SIZE - 2, 2);
+    }
+}
+
+// ФУНКЦИЯ ДЛЯ ПРИЗРАЧНОЙ ФИГУРЫ
+function drawGhostPiece() {
+    if (!currentPiece) return;
     
-    // Тень
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-    ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, 2);
-    ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, 2, BLOCK_SIZE);
+    const ghost = {
+        matrix: currentPiece.matrix,
+        color: currentPiece.color,
+        pos: { ...currentPiece.pos }
+    };
     
-    // Свет
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-    ctx.fillRect(x * BLOCK_SIZE + BLOCK_SIZE - 2, y * BLOCK_SIZE + 2, 2, BLOCK_SIZE - 2);
-    ctx.fillRect(x * BLOCK_SIZE + 2, y * BLOCK_SIZE + BLOCK_SIZE - 2, BLOCK_SIZE - 2, 2);
+    // Находим нижнюю позицию
+    while (!checkCollision(ghost)) {
+        ghost.pos.y++;
+    }
+    ghost.pos.y--; // Возвращаем на последнюю валидную позицию
+    
+    // Рисуем призрачную фигуру
+    ghost.matrix.forEach((row, y) => {
+        row.forEach((cell, x) => {
+            if (cell) {
+                drawBlock(x + ghost.pos.x, y + ghost.pos.y, ghost.color, true);
+            }
+        });
+    });
 }
 
 function draw() {
@@ -280,6 +316,9 @@ function draw() {
             if (color) drawBlock(x, y, color);
         });
     });
+    
+    // Призрачная фигура (рисуем ПЕРЕД текущей)
+    drawGhostPiece();
     
     // Текущая фигура
     if (currentPiece) {
