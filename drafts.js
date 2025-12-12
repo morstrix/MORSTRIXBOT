@@ -5,41 +5,36 @@ const COLS = 10;
 const ROWS = 20;
 let BLOCK_SIZE = 25;
 let DROP_SPEED = 1000;
-const HARD_DROP_SPEED = 50; // Швидкість при швидкому опусканні
+const HARD_DROP_SPEED = 50;
 
 // === ТЕМНІ БЕНЗИНОВІ КОЛЬОРИ ===
 const PIECE_COLORS = [
-    '#1a3a3a', // Темний бензиновий зелений
-    '#2a2a4a', // Темний фіолетовий
-    '#3a2a1a', // Темний коричневий
-    '#1a2a3a', // Темний синій
-    '#2a3a2a', // Темний оливковий
-    '#3a1a2a', // Темний бордовий
-    '#2a1a3a'  // Темний індиго
+    '#1a3a3a', '#2a2a4a', '#3a2a1a', '#1a2a3a',
+    '#2a3a2a', '#3a1a2a', '#2a1a3a'
 ];
 
 // === СТАН ГРИ ===
-let canvas, ctx, nextCanvas, nextCtx;
+let canvas, ctx, nextCanvas, nextCtx, mobileNextCanvas, mobileNextCtx;
 let board = [];
 let currentPiece, nextPiece;
 let dropCounter = 0;
 let lastTime = 0;
 let isGameOver = false;
-let isHardDrop = false;
 let score = 0;
 let lines = 0;
 let level = 1;
 let gameSpeed = DROP_SPEED;
+let isMobile = window.innerWidth <= 768;
 
 // === ФІГУРИ TETRIS ===
 const PIECES = [
-    { matrix: [[1, 1], [1, 1]], name: 'O' }, // O
-    { matrix: [[0, 1, 0], [1, 1, 1], [0, 0, 0]], name: 'T' }, // T
-    { matrix: [[0, 0, 0, 0], [1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0]], name: 'I' }, // I
-    { matrix: [[0, 1, 0], [0, 1, 0], [0, 1, 1]], name: 'L' }, // L
-    { matrix: [[0, 1, 0], [0, 1, 0], [1, 1, 0]], name: 'J' }, // J
-    { matrix: [[0, 1, 1], [1, 1, 0], [0, 0, 0]], name: 'S' }, // S
-    { matrix: [[1, 1, 0], [0, 1, 1], [0, 0, 0]], name: 'Z' }  // Z
+    { matrix: [[1, 1], [1, 1]] },
+    { matrix: [[0, 1, 0], [1, 1, 1], [0, 0, 0]] },
+    { matrix: [[0, 0, 0, 0], [1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0]] },
+    { matrix: [[0, 1, 0], [0, 1, 0], [0, 1, 1]] },
+    { matrix: [[0, 1, 0], [0, 1, 0], [1, 1, 0]] },
+    { matrix: [[0, 1, 1], [1, 1, 0], [0, 0, 0]] },
+    { matrix: [[1, 1, 0], [0, 1, 1], [0, 0, 0]] }
 ];
 
 // === ІНІЦІАЛІЗАЦІЯ ===
@@ -50,13 +45,18 @@ function init() {
     nextCanvas = document.getElementById('next-piece-canvas');
     nextCtx = nextCanvas.getContext('2d');
     
-    // Розмір блоку
-    BLOCK_SIZE = Math.floor(Math.min(window.innerWidth * 0.4, window.innerHeight * 0.7) / COLS);
+    mobileNextCanvas = document.getElementById('mobile-next-canvas');
+    mobileNextCtx = mobileNextCanvas.getContext('2d');
+    
+    // Определяем размер блока
+    const availableWidth = window.innerWidth * (isMobile ? 0.9 : 0.4);
+    const availableHeight = window.innerHeight * (isMobile ? 0.5 : 0.7);
+    BLOCK_SIZE = Math.floor(Math.min(availableWidth, availableHeight) / COLS);
     
     canvas.width = COLS * BLOCK_SIZE;
     canvas.height = ROWS * BLOCK_SIZE;
     
-    // Ініціалізація поля
+    // Инициализация поля
     for (let y = 0; y < ROWS; y++) {
         board[y] = Array(COLS).fill(0);
     }
@@ -74,6 +74,20 @@ function init() {
     
     updateUI();
     gameLoop();
+    
+    // Обработка изменения размера
+    window.addEventListener('resize', handleResize);
+}
+
+function handleResize() {
+    isMobile = window.innerWidth <= 768;
+    
+    const availableWidth = window.innerWidth * (isMobile ? 0.9 : 0.4);
+    const availableHeight = window.innerHeight * (isMobile ? 0.5 : 0.7);
+    BLOCK_SIZE = Math.floor(Math.min(availableWidth, availableHeight) / COLS);
+    
+    canvas.width = COLS * BLOCK_SIZE;
+    canvas.height = ROWS * BLOCK_SIZE;
 }
 
 // === УТИЛІТИ ===
@@ -84,7 +98,6 @@ function createRandomPiece() {
     return {
         matrix: piece.matrix,
         color: PIECE_COLORS[colorIndex],
-        name: piece.name,
         pos: { x: 0, y: 0 }
     };
 }
@@ -129,7 +142,10 @@ function spawnPiece() {
     
     if (checkCollision(board, currentPiece)) {
         isGameOver = true;
-        alert('ГРУ ЗАВЕРШЕНО! РЕЗУЛЬТАТ: ' + score);
+        setTimeout(() => {
+            alert('ГРУ ЗАВЕРШЕНО! РЕЗУЛЬТАТ: ' + score);
+            location.reload();
+        }, 300);
     }
 }
 
@@ -142,12 +158,10 @@ function dropPiece() {
         mergePiece();
         clearLines();
         spawnPiece();
-        isHardDrop = false;
     }
 }
 
 function hardDrop() {
-    isHardDrop = true;
     let dropDistance = 0;
     
     while (!checkCollision(board, currentPiece)) {
@@ -156,13 +170,13 @@ function hardDrop() {
     }
     
     currentPiece.pos.y--;
-    dropCounter = 0;
-    
-    // Бонуси за швидке опускання
     score += dropDistance * 2;
+    
     mergePiece();
     clearLines();
+    dropCounter = gameSpeed;
     spawnPiece();
+    
     updateUI();
 }
 
@@ -212,7 +226,6 @@ function clearLines() {
             }
         }
         
-        // Видалити заповнену лінію
         const row = board.splice(y, 1)[0].fill(0);
         board.unshift(row);
         linesCleared++;
@@ -228,29 +241,78 @@ function clearLines() {
 function updateScore(linesCleared) {
     lines += linesCleared;
     
-    // Бали за лінії
     const points = [0, 100, 300, 500, 800];
     score += points[linesCleared] * level;
     
-    // Оновлення рівня
     level = Math.floor(lines / 10) + 1;
-    
-    // Збільшення швидкості
     gameSpeed = Math.max(50, DROP_SPEED - (level - 1) * 100);
 }
 
 function updateUI() {
+    // Обновляем десктопную панель
     document.getElementById('score').textContent = score;
     document.getElementById('lines').textContent = lines;
     document.getElementById('level').textContent = level;
+    
+    // Обновляем мобильный хедер
+    document.getElementById('mobile-score').textContent = score;
+    document.getElementById('mobile-lines').textContent = lines;
+    document.getElementById('mobile-level').textContent = level;
 }
 
 // === МАЛЮВАННЯ ===
+function drawNextPiece() {
+    // Для десктопной панели
+    nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
+    
+    if (!nextPiece) return;
+    
+    const pieceSize = Math.max(nextPiece.matrix.length, nextPiece.matrix[0].length);
+    const blockSize = Math.min(80 / pieceSize, 20);
+    const offsetX = (80 - nextPiece.matrix[0].length * blockSize) / 2;
+    const offsetY = (80 - nextPiece.matrix.length * blockSize) / 2;
+    
+    drawPieceOnCanvas(nextCtx, nextPiece.matrix, nextPiece.color, blockSize, offsetX, offsetY);
+    
+    // Для мобильного хедера
+    mobileNextCtx.clearRect(0, 0, mobileNextCanvas.width, mobileNextCanvas.height);
+    
+    const mobileBlockSize = Math.min(40 / pieceSize, 10);
+    const mobileOffsetX = (40 - nextPiece.matrix[0].length * mobileBlockSize) / 2;
+    const mobileOffsetY = (40 - nextPiece.matrix.length * mobileBlockSize) / 2;
+    
+    drawPieceOnCanvas(mobileNextCtx, nextPiece.matrix, nextPiece.color, mobileBlockSize, mobileOffsetX, mobileOffsetY);
+}
+
+function drawPieceOnCanvas(context, matrix, color, blockSize, offsetX, offsetY) {
+    matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+            if (value !== 0) {
+                context.fillStyle = color;
+                context.fillRect(
+                    offsetX + x * blockSize,
+                    offsetY + y * blockSize,
+                    blockSize,
+                    blockSize
+                );
+                
+                context.strokeStyle = '#444';
+                context.lineWidth = 1;
+                context.strokeRect(
+                    offsetX + x * blockSize,
+                    offsetY + y * blockSize,
+                    blockSize,
+                    blockSize
+                );
+            }
+        });
+    });
+}
+
 function drawMatrix(matrix, offset, color) {
     matrix.forEach((row, y) => {
         row.forEach((value, x) => {
             if (value !== 0) {
-                // Основний блок
                 ctx.fillStyle = color;
                 ctx.fillRect(
                     (x + offset.x) * BLOCK_SIZE,
@@ -259,7 +321,6 @@ function drawMatrix(matrix, offset, color) {
                     BLOCK_SIZE
                 );
                 
-                // Темніша тінь зверху/зліва
                 ctx.fillStyle = darkenColor(color, 0.3);
                 ctx.fillRect(
                     (x + offset.x) * BLOCK_SIZE,
@@ -274,7 +335,6 @@ function drawMatrix(matrix, offset, color) {
                     BLOCK_SIZE - 1
                 );
                 
-                // Світліший край знизу/справа
                 ctx.fillStyle = lightenColor(color, 0.3);
                 ctx.fillRect(
                     (x + offset.x) * BLOCK_SIZE + BLOCK_SIZE - 2,
@@ -321,7 +381,6 @@ function drawGrid() {
     ctx.strokeStyle = '#222';
     ctx.lineWidth = 0.5;
     
-    // Вертикальні лінії
     for (let x = 0; x <= COLS; x++) {
         ctx.beginPath();
         ctx.moveTo(x * BLOCK_SIZE, 0);
@@ -329,7 +388,6 @@ function drawGrid() {
         ctx.stroke();
     }
     
-    // Горизонтальні лінії
     for (let y = 0; y <= ROWS; y++) {
         ctx.beginPath();
         ctx.moveTo(0, y * BLOCK_SIZE);
@@ -339,7 +397,7 @@ function drawGrid() {
 }
 
 function drawGhostPiece() {
-    if (!currentPiece || isHardDrop) return;
+    if (!currentPiece) return;
     
     const ghost = {
         matrix: currentPiece.matrix,
@@ -357,50 +415,12 @@ function drawGhostPiece() {
     ctx.globalAlpha = 1.0;
 }
 
-function drawNextPiece() {
-    nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
-    
-    if (!nextPiece) return;
-    
-    // Центрування фігури
-    const pieceSize = Math.max(nextPiece.matrix.length, nextPiece.matrix[0].length);
-    const blockSize = Math.min(80 / pieceSize, 20);
-    const offsetX = (80 - nextPiece.matrix[0].length * blockSize) / 2;
-    const offsetY = (80 - nextPiece.matrix.length * blockSize) / 2;
-    
-    nextPiece.matrix.forEach((row, y) => {
-        row.forEach((value, x) => {
-            if (value !== 0) {
-                nextCtx.fillStyle = nextPiece.color;
-                nextCtx.fillRect(
-                    offsetX + x * blockSize,
-                    offsetY + y * blockSize,
-                    blockSize,
-                    blockSize
-                );
-                
-                // Рамка
-                nextCtx.strokeStyle = '#444';
-                nextCtx.lineWidth = 1;
-                nextCtx.strokeRect(
-                    offsetX + x * blockSize,
-                    offsetY + y * blockSize,
-                    blockSize,
-                    blockSize
-                );
-            }
-        });
-    });
-}
-
 function draw() {
-    // Фон
     ctx.fillStyle = '#0a0a0a';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
     drawGrid();
     
-    // Малювання фіксованих блоків
     board.forEach((row, y) => {
         row.forEach((value, x) => {
             if (value !== 0) {
@@ -409,10 +429,8 @@ function draw() {
         });
     });
     
-    // Привид фігури
     drawGhostPiece();
     
-    // Поточна фігура
     if (currentPiece) {
         drawMatrix(currentPiece.matrix, currentPiece.pos, currentPiece.color);
     }
@@ -420,13 +438,11 @@ function draw() {
 
 // === ОБРОБКА ПОДІЙ ===
 function setupEvents() {
-    // Кнопки управління
     document.getElementById('left-btn').addEventListener('click', () => movePiece(-1));
     document.getElementById('right-btn').addEventListener('click', () => movePiece(1));
     document.getElementById('rotate-btn').addEventListener('click', rotatePiece);
     document.getElementById('hard-drop-btn').addEventListener('click', hardDrop);
     
-    // Клавіатура
     document.addEventListener('keydown', e => {
         if (isGameOver) return;
         
@@ -435,11 +451,10 @@ function setupEvents() {
             case 'ArrowRight': movePiece(1); break;
             case 'ArrowDown': dropPiece(); break;
             case 'ArrowUp': rotatePiece(); break;
-            case ' ': hardDrop(); break; // Пробіл для швидкого опускання
+            case ' ': hardDrop(); break;
         }
     });
     
-    // Заборона прокрутки при свайпах
     document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
 }
 
@@ -452,9 +467,7 @@ function gameLoop(time = 0) {
     
     dropCounter += deltaTime;
     
-    const speed = isHardDrop ? HARD_DROP_SPEED : gameSpeed;
-    
-    if (dropCounter > speed) {
+    if (dropCounter > gameSpeed) {
         dropPiece();
     }
     
