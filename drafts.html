@@ -138,17 +138,17 @@
             height: auto;
         }
         
-        /* 4 КНОПКИ В РЯД */
+        /* 4 КНОПКИ С ХОРОШИМИ ОТСТУПАМИ */
         .controls {
             background: var(--controls-bg);
-            padding: 12px 10px;
+            padding: 15px 10px;
             border-top: 2px solid #333;
             display: flex;
-            justify-content: center;
+            justify-content: space-around; /* Равномерное распределение */
             align-items: center;
             flex-shrink: 0;
-            height: 90px;
-            gap: 20px;
+            height: 100px; /* Чуть выше для отступов */
+            gap: 10px; /* Отступы между кнопками */
         }
         
         .game-btn {
@@ -159,11 +159,13 @@
             user-select: none;
             touch-action: manipulation;
             transition: transform 0.1s;
-            width: 70px;
-            height: 70px;
             display: flex;
             align-items: center;
             justify-content: center;
+            flex: 1; /* Равная ширина для всех кнопок */
+            max-width: 80px; /* МАКСИМАЛЬНЫЙ размер кнопки */
+            height: 80px;
+            margin: 0 5px; /* Отступы слева/справа у каждой кнопки */
         }
         
         .game-btn:active {
@@ -171,10 +173,11 @@
         }
         
         .game-btn img {
-            width: 100%;
+            width: 100%; /* Занимает всю кнопку */
             height: 100%;
             object-fit: contain;
             filter: brightness(1.2);
+            pointer-events: none; /* Чтобы клик проходил через картинку на кнопку */
         }
         
         /* МОБИЛЬНАЯ АДАПТАЦИЯ */
@@ -214,17 +217,19 @@
             }
             
             .controls {
-                height: 80px;
-                padding: 10px 8px;
-                gap: 15px;
+                height: 90px;
+                padding: 12px 8px;
+                gap: 8px;
             }
             
             .game-btn {
-                width: 60px;
-                height: 60px;
+                max-width: 70px; /* Меньше на мобильных */
+                height: 70px;
+                margin: 0 3px;
             }
         }
         
+        /* МАЛЕНЬКИЕ АНДРОИДЫ */
         @media (max-width: 480px) {
             .top-panel {
                 height: 50px;
@@ -256,27 +261,45 @@
             }
             
             .controls {
-                height: 75px;
-                padding: 8px 6px;
-                gap: 12px;
+                height: 85px;
+                padding: 10px 6px;
+                gap: 6px;
             }
             
             .game-btn {
-                width: 55px;
-                height: 55px;
+                max-width: 65px; /* Еще меньше на маленьких экранах */
+                height: 65px;
+                margin: 0 2px;
             }
         }
         
-        @media (min-width: 769px) {
+        /* ОЧЕНЬ МАЛЕНЬКИЕ ЭКРАНЫ */
+        @media (max-width: 360px) {
             .controls {
-                height: 100px;
-                padding: 15px;
-                gap: 25px;
+                height: 80px;
+                padding: 8px 4px;
+                gap: 4px;
             }
             
             .game-btn {
-                width: 80px;
-                height: 80px;
+                max-width: 60px;
+                height: 60px;
+                margin: 0 1px;
+            }
+        }
+        
+        /* ДЕСКТОП */
+        @media (min-width: 769px) {
+            .controls {
+                height: 110px;
+                padding: 20px 15px;
+                gap: 15px;
+            }
+            
+            .game-btn {
+                max-width: 90px;
+                height: 90px;
+                margin: 0 8px;
             }
             
             .game-btn:hover {
@@ -286,6 +309,17 @@
             .game-btn:active {
                 transform: scale(0.9);
             }
+        }
+        
+        /* ДОПОЛНИТЕЛЬНЫЕ СТИЛИ ДЛЯ ЛУЧШЕЙ КЛИКАБЕЛЬНОСТИ */
+        .game-btn::after {
+            content: '';
+            position: absolute;
+            top: -10px;
+            bottom: -10px;
+            left: -10px;
+            right: -10px;
+            z-index: -1;
         }
     </style>
 </head>
@@ -329,19 +363,19 @@
     <canvas id="tetris-canvas"></canvas>
 </div>
 
-<!-- 4 КНОПКИ В РЯД -->
+<!-- 4 КНОПКИ С ХОРОШИМИ ОТСТУПАМИ -->
 <div class="controls">
-    <button id="left-btn" class="game-btn">
-        <img src="1.png" alt="Left">
+    <button id="left-btn" class="game-btn" aria-label="Move left">
+        <img src="1.png" alt="Left" loading="lazy">
     </button>
-    <button id="rotate-btn" class="game-btn">
-        <img src="2.png" alt="Rotate">
+    <button id="rotate-btn" class="game-btn" aria-label="Rotate">
+        <img src="2.png" alt="Rotate" loading="lazy">
     </button>
-    <button id="right-btn" class="game-btn">
-        <img src="3.png" alt="Right">
+    <button id="right-btn" class="game-btn" aria-label="Move right">
+        <img src="3.png" alt="Right" loading="lazy">
     </button>
-    <button id="down-btn" class="game-btn">
-        <img src="4.png" alt="Down">
+    <button id="down-btn" class="game-btn" aria-label="Drop fast">
+        <img src="4.png" alt="Down" loading="lazy">
     </button>
 </div>
 
