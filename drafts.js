@@ -23,6 +23,7 @@ let score = 0;
 let lines = 0;
 let level = 1;
 let gameSpeed = DROP_SPEED;
+let isMobile = window.innerWidth <= 768;
 
 // === ФИГУРЫ ===
 const PIECES = [
@@ -43,6 +44,7 @@ function init() {
     nextCanvas = document.getElementById('next-piece-canvas');
     nextCtx = nextCanvas.getContext('2d');
     
+    isMobile = window.innerWidth <= 768;
     calculateCanvasSize();
     setupEvents();
     nextPiece = createRandomPiece();
@@ -57,13 +59,16 @@ function init() {
     
     updateUI();
     requestAnimationFrame(gameLoop);
-    window.addEventListener('resize', calculateCanvasSize);
+    window.addEventListener('resize', () => {
+        isMobile = window.innerWidth <= 768;
+        calculateCanvasSize();
+    });
 }
 
 function calculateCanvasSize() {
     const gameArea = document.querySelector('.game-area');
-    const maxWidth = gameArea.clientWidth - 20;
-    const maxHeight = gameArea.clientHeight - 20;
+    const maxWidth = gameArea.clientWidth - 16;
+    const maxHeight = gameArea.clientHeight - 16;
     
     const blockByWidth = Math.floor(maxWidth / COLS);
     const blockByHeight = Math.floor(maxHeight / ROWS);
@@ -221,7 +226,7 @@ function drawNextPiece() {
     nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
     if (!nextPiece) return;
     
-    const size = Math.min(40 / nextPiece.matrix.length, 10);
+    const size = isMobile ? 8 : 10;
     const offsetX = (40 - nextPiece.matrix[0].length * size) / 2;
     const offsetY = (40 - nextPiece.matrix.length * size) / 2;
     
@@ -230,7 +235,7 @@ function drawNextPiece() {
             if (cell) {
                 nextCtx.fillStyle = nextPiece.color;
                 nextCtx.fillRect(offsetX + x * size, offsetY + y * size, size, size);
-                nextCtx.strokeStyle = '#444';
+                nextCtx.strokeStyle = '#666';
                 nextCtx.strokeRect(offsetX + x * size, offsetY + y * size, size, size);
             }
         });
@@ -239,31 +244,50 @@ function drawNextPiece() {
 
 function drawBlock(x, y, color, isGhost = false) {
     if (isGhost) {
+        // ДЛЯ МОБИЛЬНЫХ - БОЛЕЕ ЗАМЕТНЫЙ ПРИЗРАК
+        const ghostAlpha = isMobile ? 0.35 : 0.25;
+        const lineWidth = isMobile ? 2 : 1;
+        
         ctx.fillStyle = color;
-        ctx.globalAlpha = 0.25;
+        ctx.globalAlpha = ghostAlpha;
         ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
         ctx.globalAlpha = 1.0;
         
+        // Контур для призрака
         ctx.strokeStyle = color;
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x * BLOCK_SIZE + 1, y * BLOCK_SIZE + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2);
+        ctx.lineWidth = lineWidth;
+        ctx.strokeRect(
+            x * BLOCK_SIZE + lineWidth/2, 
+            y * BLOCK_SIZE + lineWidth/2, 
+            BLOCK_SIZE - lineWidth, 
+            BLOCK_SIZE - lineWidth
+        );
+        
+        // Точки по углам (для лучшей видимости)
+        if (isMobile) {
+            ctx.fillStyle = color;
+            ctx.fillRect(x * BLOCK_SIZE + 2, y * BLOCK_SIZE + 2, 3, 3);
+            ctx.fillRect(x * BLOCK_SIZE + BLOCK_SIZE - 5, y * BLOCK_SIZE + 2, 3, 3);
+            ctx.fillRect(x * BLOCK_SIZE + 2, y * BLOCK_SIZE + BLOCK_SIZE - 5, 3, 3);
+            ctx.fillRect(x * BLOCK_SIZE + BLOCK_SIZE - 5, y * BLOCK_SIZE + BLOCK_SIZE - 5, 3, 3);
+        }
     } else {
+        // Обычный блок
         ctx.fillStyle = color;
         ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
         
         // Тень
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-        ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, 2);
-        ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, 2, BLOCK_SIZE);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, 3);
+        ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, 3, BLOCK_SIZE);
         
         // Свет
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-        ctx.fillRect(x * BLOCK_SIZE + BLOCK_SIZE - 2, y * BLOCK_SIZE + 2, 2, BLOCK_SIZE - 2);
-        ctx.fillRect(x * BLOCK_SIZE + 2, y * BLOCK_SIZE + BLOCK_SIZE - 2, BLOCK_SIZE - 2, 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.fillRect(x * BLOCK_SIZE + BLOCK_SIZE - 3, y * BLOCK_SIZE + 3, 3, BLOCK_SIZE - 3);
+        ctx.fillRect(x * BLOCK_SIZE + 3, y * BLOCK_SIZE + BLOCK_SIZE - 3, BLOCK_SIZE - 3, 3);
     }
 }
 
-// ФУНКЦИЯ ДЛЯ ПРИЗРАЧНОЙ ФИГУРЫ
 function drawGhostPiece() {
     if (!currentPiece) return;
     
@@ -273,13 +297,11 @@ function drawGhostPiece() {
         pos: { ...currentPiece.pos }
     };
     
-    // Находим нижнюю позицию
     while (!checkCollision(ghost)) {
         ghost.pos.y++;
     }
-    ghost.pos.y--; // Возвращаем на последнюю валидную позицию
+    ghost.pos.y--;
     
-    // Рисуем призрачную фигуру
     ghost.matrix.forEach((row, y) => {
         row.forEach((cell, x) => {
             if (cell) {
@@ -294,9 +316,10 @@ function draw() {
     ctx.fillStyle = '#0a0a0a';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Сетка
-    ctx.strokeStyle = '#222';
-    ctx.lineWidth = 0.5;
+    // Сетка (светлее на мобильных)
+    ctx.strokeStyle = isMobile ? '#333' : '#222';
+    ctx.lineWidth = isMobile ? 0.7 : 0.5;
+    
     for (let x = 0; x <= COLS; x++) {
         ctx.beginPath();
         ctx.moveTo(x * BLOCK_SIZE, 0);
@@ -317,7 +340,7 @@ function draw() {
         });
     });
     
-    // Призрачная фигура (рисуем ПЕРЕД текущей)
+    // Призрачная фигура
     drawGhostPiece();
     
     // Текущая фигура
@@ -339,6 +362,38 @@ function setupEvents() {
     document.getElementById('rotate-btn').onclick = rotatePiece;
     document.getElementById('hard-drop-btn').onclick = hardDrop;
     
+    // Свайпы для мобильных
+    let touchStartX = 0;
+    let touchStartY = 0;
+    
+    canvas.addEventListener('touchstart', (e) => {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        e.preventDefault();
+    }, { passive: false });
+    
+    canvas.addEventListener('touchend', (e) => {
+        const touchEndX = e.changedTouches[0].clientX;
+        const touchEndY = e.changedTouches[0].clientY;
+        
+        const dx = touchEndX - touchStartX;
+        const dy = touchEndY - touchStartY;
+        
+        const minSwipe = 30;
+        
+        if (Math.abs(dx) > Math.abs(dy)) {
+            // Горизонтальный свайп
+            if (dx > minSwipe) movePiece(1);
+            else if (dx < -minSwipe) movePiece(-1);
+        } else {
+            // Вертикальный свайп
+            if (dy > minSwipe) dropPiece();
+            else if (dy < -minSwipe) rotatePiece();
+        }
+        
+        e.preventDefault();
+    }, { passive: false });
+    
     document.addEventListener('keydown', e => {
         if (isGameOver) return;
         switch(e.key) {
@@ -349,8 +404,6 @@ function setupEvents() {
             case ' ': hardDrop(); break;
         }
     });
-    
-    document.addEventListener('touchmove', e => e.preventDefault(), {passive: false});
 }
 
 // === ГЛАВНЫЙ ЦИКЛ ===
