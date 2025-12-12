@@ -19,6 +19,7 @@ let currentPiece, nextPiece;
 let dropCounter = 0;
 let lastTime = 0;
 let isGameOver = false;
+let isPaused = false;
 let score = 0;
 let lines = 0;
 let level = 1;
@@ -125,13 +126,14 @@ function spawnPiece() {
     if (checkCollision(currentPiece)) {
         isGameOver = true;
         setTimeout(() => {
-            alert(`ГРУ ЗАВЕРШЕНО!\nОЧКИ: ${score}\nЛИНИИ: ${lines}\nУРОВЕНЬ: ${level}`);
+            alert(`GAME OVER!\nSCORE: ${score}\nLINES: ${lines}\nLEVEL: ${level}`);
             location.reload();
         }, 300);
     }
 }
 
 function dropPiece() {
+    if (isPaused) return;
     currentPiece.pos.y++;
     if (checkCollision(currentPiece)) {
         currentPiece.pos.y--;
@@ -143,6 +145,7 @@ function dropPiece() {
 }
 
 function hardDrop() {
+    if (isPaused) return;
     let dropDistance = 0;
     while (!checkCollision(currentPiece)) {
         currentPiece.pos.y++;
@@ -158,6 +161,7 @@ function hardDrop() {
 }
 
 function movePiece(dir) {
+    if (isPaused) return;
     currentPiece.pos.x += dir;
     if (checkCollision(currentPiece)) {
         currentPiece.pos.x -= dir;
@@ -165,6 +169,7 @@ function movePiece(dir) {
 }
 
 function rotatePiece() {
+    if (isPaused) return;
     const original = currentPiece.matrix;
     currentPiece.matrix = rotate(currentPiece.matrix);
     
@@ -178,6 +183,21 @@ function rotatePiece() {
     
     currentPiece.matrix = original;
     currentPiece.pos.x = originalX;
+}
+
+function togglePause() {
+    isPaused = !isPaused;
+    const pauseBtn = document.getElementById('pause-btn');
+    const pauseIcon = pauseBtn;
+    const pauseLabel = pauseBtn.querySelector('.pause-label');
+    
+    if (isPaused) {
+        pauseBtn.textContent = '▶';
+        pauseLabel.textContent = 'PLAY';
+    } else {
+        pauseBtn.textContent = '⏸';
+        pauseLabel.textContent = 'PAUSE';
+    }
 }
 
 function mergePiece() {
@@ -244,7 +264,6 @@ function drawNextPiece() {
 
 function drawBlock(x, y, color, isGhost = false) {
     if (isGhost) {
-        // ДЛЯ МОБИЛЬНЫХ - БОЛЕЕ ЗАМЕТНЫЙ ПРИЗРАК
         const ghostAlpha = isMobile ? 0.35 : 0.25;
         const lineWidth = isMobile ? 2 : 1;
         
@@ -253,7 +272,6 @@ function drawBlock(x, y, color, isGhost = false) {
         ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
         ctx.globalAlpha = 1.0;
         
-        // Контур для призрака
         ctx.strokeStyle = color;
         ctx.lineWidth = lineWidth;
         ctx.strokeRect(
@@ -263,7 +281,6 @@ function drawBlock(x, y, color, isGhost = false) {
             BLOCK_SIZE - lineWidth
         );
         
-        // Точки по углам (для лучшей видимости)
         if (isMobile) {
             ctx.fillStyle = color;
             ctx.fillRect(x * BLOCK_SIZE + 2, y * BLOCK_SIZE + 2, 3, 3);
@@ -272,16 +289,13 @@ function drawBlock(x, y, color, isGhost = false) {
             ctx.fillRect(x * BLOCK_SIZE + BLOCK_SIZE - 5, y * BLOCK_SIZE + BLOCK_SIZE - 5, 3, 3);
         }
     } else {
-        // Обычный блок
         ctx.fillStyle = color;
         ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
         
-        // Тень
         ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
         ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, 3);
         ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, 3, BLOCK_SIZE);
         
-        // Свет
         ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
         ctx.fillRect(x * BLOCK_SIZE + BLOCK_SIZE - 3, y * BLOCK_SIZE + 3, 3, BLOCK_SIZE - 3);
         ctx.fillRect(x * BLOCK_SIZE + 3, y * BLOCK_SIZE + BLOCK_SIZE - 3, BLOCK_SIZE - 3, 3);
@@ -289,7 +303,7 @@ function drawBlock(x, y, color, isGhost = false) {
 }
 
 function drawGhostPiece() {
-    if (!currentPiece) return;
+    if (!currentPiece || isPaused) return;
     
     const ghost = {
         matrix: currentPiece.matrix,
@@ -311,12 +325,26 @@ function drawGhostPiece() {
     });
 }
 
+function drawPauseScreen() {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${BLOCK_SIZE * 1.5}px 'Courier New'`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    ctx.fillText('PAUSED', canvas.width / 2, canvas.height / 2 - BLOCK_SIZE);
+    
+    ctx.font = `${BLOCK_SIZE * 0.8}px 'Courier New'`;
+    ctx.fillStyle = '#aaa';
+    ctx.fillText('Tap PAUSE to continue', canvas.width / 2, canvas.height / 2 + BLOCK_SIZE);
+}
+
 function draw() {
-    // Фон
     ctx.fillStyle = '#0a0a0a';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Сетка (светлее на мобильных)
     ctx.strokeStyle = isMobile ? '#333' : '#222';
     ctx.lineWidth = isMobile ? 0.7 : 0.5;
     
@@ -333,17 +361,14 @@ function draw() {
         ctx.stroke();
     }
     
-    // Старые блоки
     board.forEach((row, y) => {
         row.forEach((color, x) => {
             if (color) drawBlock(x, y, color);
         });
     });
     
-    // Призрачная фигура
     drawGhostPiece();
     
-    // Текущая фигура
     if (currentPiece) {
         currentPiece.matrix.forEach((row, y) => {
             row.forEach((cell, x) => {
@@ -353,16 +378,24 @@ function draw() {
             });
         });
     }
+    
+    if (isPaused) {
+        drawPauseScreen();
+    }
 }
 
 // === СОБЫТИЯ ===
 function setupEvents() {
+    // 4 кнопки
     document.getElementById('left-btn').onclick = () => movePiece(-1);
-    document.getElementById('right-btn').onclick = () => movePiece(1);
     document.getElementById('rotate-btn').onclick = rotatePiece;
-    document.getElementById('hard-drop-btn').onclick = hardDrop;
+    document.getElementById('right-btn').onclick = () => movePiece(1);
+    document.getElementById('down-btn').onclick = hardDrop; // Быстрое падение
     
-    // Свайпы для мобильных
+    // Пауза
+    document.getElementById('pause-btn').onclick = togglePause;
+    
+    // Свайпы
     let touchStartX = 0;
     let touchStartY = 0;
     
@@ -373,6 +406,8 @@ function setupEvents() {
     }, { passive: false });
     
     canvas.addEventListener('touchend', (e) => {
+        if (isPaused) return;
+        
         const touchEndX = e.changedTouches[0].clientX;
         const touchEndY = e.changedTouches[0].clientY;
         
@@ -382,26 +417,29 @@ function setupEvents() {
         const minSwipe = 30;
         
         if (Math.abs(dx) > Math.abs(dy)) {
-            // Горизонтальный свайп
             if (dx > minSwipe) movePiece(1);
             else if (dx < -minSwipe) movePiece(-1);
         } else {
-            // Вертикальный свайп
-            if (dy > minSwipe) dropPiece();
+            if (dy > minSwipe) dropPiece(); // Обычное падение
             else if (dy < -minSwipe) rotatePiece();
         }
         
         e.preventDefault();
     }, { passive: false });
     
+    // Клавиатура
     document.addEventListener('keydown', e => {
         if (isGameOver) return;
+        
         switch(e.key) {
             case 'ArrowLeft': movePiece(-1); break;
             case 'ArrowRight': movePiece(1); break;
             case 'ArrowDown': dropPiece(); break;
             case 'ArrowUp': rotatePiece(); break;
             case ' ': hardDrop(); break;
+            case 'p':
+            case 'P':
+            case 'Escape': togglePause(); break;
         }
     });
 }
@@ -413,9 +451,11 @@ function gameLoop(time) {
     const delta = time - (lastTime || time);
     lastTime = time;
     
-    dropCounter += delta;
-    if (dropCounter > gameSpeed) {
-        dropPiece();
+    if (!isPaused) {
+        dropCounter += delta;
+        if (dropCounter > gameSpeed) {
+            dropPiece();
+        }
     }
     
     draw();

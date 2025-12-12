@@ -14,11 +14,6 @@
             --text: #fff;
             --grid: #111;
             --controls-bg: rgba(10, 10, 10, 0.95);
-            --btn-bg: #222;
-            --btn-active: #444;
-            --btn-green: #1a3a1a;
-            --btn-purple: #2a2a4a;
-            --btn-red: #3a1a1a;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body {
@@ -36,7 +31,7 @@
             flex-direction: column;
         }
         
-        /* ВЕРХНЯЯ ПАНЕЛЬ */
+        /* ВЕРХНЯЯ ПАНЕЛЬ С ПАУЗОЙ */
         .top-panel {
             background: rgba(20, 20, 20, 0.95);
             padding: 8px 10px;
@@ -73,11 +68,48 @@
             font-size: 1.1em;
         }
         
-        .next-piece-box {
+        /* ПРАВАЯ ЧАСТЬ С ПАУЗОЙ И NEXT */
+        .right-panel {
             display: flex;
             align-items: center;
-            gap: 8px;
-            margin-right: 5px;
+            gap: 15px;
+        }
+        
+        .pause-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        #pause-btn {
+            background: none;
+            border: none;
+            color: #aaa;
+            font-size: 1.8em;
+            cursor: pointer;
+            padding: 5px;
+            transition: color 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
+        }
+        
+        #pause-btn:active {
+            color: #fff;
+            transform: scale(0.95);
+        }
+        
+        .pause-label {
+            color: #888;
+            font-size: 0.7em;
+        }
+        
+        .next-piece-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
         }
         
         #next-piece-canvas {
@@ -106,169 +138,43 @@
             height: auto;
         }
         
-        /* УПРАВЛЕНИЕ С ИКОНКАМИ */
+        /* 4 КНОПКИ В РЯД */
         .controls {
             background: var(--controls-bg);
-            padding: 15px 10px;
+            padding: 12px 10px;
             border-top: 2px solid #333;
             display: flex;
-            justify-content: space-between;
+            justify-content: center;
             align-items: center;
             flex-shrink: 0;
-            height: 120px;
-            gap: 15px;
+            height: 90px;
+            gap: 20px;
         }
         
-        /* ЛЕВАЯ ГРУППА - КРЕСТОВИНА С ИКОНКАМИ */
-        .dpad-container {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            grid-template-rows: repeat(3, 1fr);
-            gap: 5px;
-            width: 150px;
-            height: 150px;
-            position: relative;
-        }
-        
-        .dpad-btn {
-            background: var(--btn-bg);
+        .game-btn {
+            background: none;
             border: none;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            user-select: none;
-            touch-action: manipulation;
-            transition: all 0.1s;
             padding: 0;
-            overflow: hidden;
-        }
-        
-        .dpad-btn:active {
-            background: var(--btn-active);
-            transform: scale(0.95);
-        }
-        
-        .dpad-btn img {
-            width: 60%;
-            height: 60%;
-            object-fit: contain;
-            filter: invert(1) brightness(1.5);
+            cursor: pointer;
+            user-select: none;
+            touch-action: manipulation;
             transition: transform 0.1s;
-        }
-        
-        .dpad-btn:active img {
-            transform: scale(0.9);
-        }
-        
-        #dpad-up {
-            grid-column: 2;
-            grid-row: 1;
-            background: var(--btn-purple);
-        }
-        
-        #dpad-left {
-            grid-column: 1;
-            grid-row: 2;
-            background: var(--btn-green);
-        }
-        
-        #dpad-right {
-            grid-column: 3;
-            grid-row: 2;
-            background: var(--btn-green);
-        }
-        
-        #dpad-down {
-            grid-column: 2;
-            grid-row: 3;
-            background: var(--btn-red);
-        }
-        
-        /* ЦЕНТРАЛЬНАЯ ГРУППА */
-        .center-buttons {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            align-items: center;
-            flex: 1;
-            max-width: 200px;
-        }
-        
-        .action-btn {
-            background: var(--btn-bg);
-            border: none;
-            border-radius: 12px;
-            color: white;
-            font-size: 1em;
-            padding: 12px 20px;
-            width: 100%;
-            cursor: pointer;
-            user-select: none;
-            touch-action: manipulation;
-            transition: all 0.1s;
+            width: 70px;
+            height: 70px;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
-            font-weight: bold;
-            letter-spacing: 1px;
         }
         
-        .action-btn:active {
-            background: var(--btn-active);
-            transform: scale(0.98);
+        .game-btn:active {
+            transform: scale(0.85);
         }
         
-        #rotate-btn {
-            background: linear-gradient(135deg, #2a2a4a, #3a3a6a);
-            border: 1px solid #4a4a8a;
-        }
-        
-        #hard-drop-btn {
-            background: linear-gradient(135deg, #3a1a1a, #5a2a2a);
-            border: 1px solid #6a3a3a;
-            font-size: 1.1em;
-        }
-        
-        .btn-icon {
-            font-size: 1.2em;
-        }
-        
-        /* ПРАВАЯ ГРУППА - БОЛЬШАЯ КНОПКА */
-        .right-button {
-            width: 120px;
-            height: 100%;
-        }
-        
-        #pause-btn {
+        .game-btn img {
             width: 100%;
             height: 100%;
-            background: linear-gradient(135deg, #1a2a3a, #2a3a5a);
-            border: 2px solid #3a4a6a;
-            border-radius: 15px;
-            color: white;
-            font-size: 1.2em;
-            font-weight: bold;
-            cursor: pointer;
-            user-select: none;
-            touch-action: manipulation;
-            transition: all 0.1s;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 5px;
-        }
-        
-        #pause-btn:active {
-            background: linear-gradient(135deg, #2a3a5a, #3a4a7a);
-            transform: scale(0.97);
-        }
-        
-        .pause-icon {
-            font-size: 2em;
+            object-fit: contain;
+            filter: brightness(1.2);
         }
         
         /* МОБИЛЬНАЯ АДАПТАЦИЯ */
@@ -294,53 +200,28 @@
                 font-size: 1em;
             }
             
+            .right-panel {
+                gap: 10px;
+            }
+            
             #next-piece-canvas {
                 width: 35px;
                 height: 35px;
             }
             
-            .controls {
-                height: 110px;
-                padding: 10px 8px;
-                gap: 10px;
-            }
-            
-            .dpad-container {
-                width: 130px;
-                height: 130px;
-            }
-            
-            .dpad-btn img {
-                width: 55%;
-                height: 55%;
-            }
-            
-            .center-buttons {
-                max-width: 170px;
-                gap: 8px;
-            }
-            
-            .action-btn {
-                padding: 10px 15px;
-                font-size: 0.9em;
-                border-radius: 10px;
-            }
-            
-            #hard-drop-btn {
-                font-size: 1em;
-            }
-            
-            .right-button {
-                width: 100px;
-            }
-            
             #pause-btn {
-                font-size: 1em;
-                border-radius: 12px;
+                font-size: 1.6em;
             }
             
-            .pause-icon {
-                font-size: 1.7em;
+            .controls {
+                height: 80px;
+                padding: 10px 8px;
+                gap: 15px;
+            }
+            
+            .game-btn {
+                width: 60px;
+                height: 60px;
             }
         }
         
@@ -358,87 +239,59 @@
                 font-size: 0.65em;
             }
             
-            .controls {
-                height: 100px;
-                padding: 8px 6px;
+            .stat-value {
+                font-size: 0.9em;
+            }
+            
+            .right-panel {
                 gap: 8px;
             }
             
-            .dpad-container {
-                width: 110px;
-                height: 110px;
-                gap: 4px;
-            }
-            
-            .dpad-btn img {
-                width: 50%;
-                height: 50%;
-            }
-            
-            .center-buttons {
-                max-width: 140px;
-                gap: 6px;
-            }
-            
-            .action-btn {
-                padding: 8px 12px;
-                font-size: 0.8em;
-                border-radius: 8px;
-            }
-            
-            .btn-icon {
-                font-size: 1em;
-            }
-            
-            .right-button {
-                width: 80px;
-            }
-            
             #pause-btn {
-                font-size: 0.9em;
-                border-radius: 10px;
-                padding: 5px;
+                font-size: 1.4em;
             }
             
-            .pause-icon {
-                font-size: 1.5em;
+            .pause-label {
+                font-size: 0.65em;
+            }
+            
+            .controls {
+                height: 75px;
+                padding: 8px 6px;
+                gap: 12px;
+            }
+            
+            .game-btn {
+                width: 55px;
+                height: 55px;
             }
         }
         
         @media (min-width: 769px) {
             .controls {
-                height: 130px;
-                padding: 20px 15px;
+                height: 100px;
+                padding: 15px;
+                gap: 25px;
             }
             
-            .dpad-container {
-                width: 160px;
-                height: 160px;
-                gap: 8px;
+            .game-btn {
+                width: 80px;
+                height: 80px;
             }
             
-            .dpad-btn img {
-                width: 65%;
-                height: 65%;
+            .game-btn:hover {
+                transform: scale(1.05);
             }
             
-            .dpad-btn:hover {
-                filter: brightness(1.2);
-            }
-            
-            .action-btn:hover {
-                filter: brightness(1.2);
-            }
-            
-            #pause-btn:hover {
-                filter: brightness(1.2);
+            .game-btn:active {
+                transform: scale(0.9);
             }
         }
     </style>
 </head>
 <body>
 
-<!-- ВЕРХНЯЯ ПАНЕЛЬ -->
+<!-- ВЕРХНЯЯ ПАНЕЛЬ С ПАУЗОЙ -->
 <div class="top-panel">
     <div class="stats-container">
         <div class="stat-box">
@@ -455,9 +308,19 @@
         </div>
     </div>
     
-    <div class="next-piece-box">
-        <div class="stat-label">NEXT</div>
-        <canvas id="next-piece-canvas" width="40" height="40"></canvas>
+    <!-- ПРАВАЯ ЧАСТЬ С ПАУЗОЙ И NEXT -->
+    <div class="right-panel">
+        <div class="pause-container">
+            <button id="pause-btn">
+                ⏸
+                <span class="pause-label">PAUSE</span>
+            </button>
+        </div>
+        
+        <div class="next-piece-box">
+            <div class="stat-label">NEXT</div>
+            <canvas id="next-piece-canvas" width="40" height="40"></canvas>
+        </div>
     </div>
 </div>
 
@@ -466,43 +329,20 @@
     <canvas id="tetris-canvas"></canvas>
 </div>
 
-<!-- УПРАВЛЕНИЕ С ИКОНКАМИ -->
+<!-- 4 КНОПКИ В РЯД -->
 <div class="controls">
-    <!-- ЛЕВАЯ ЧАСТЬ - КРЕСТОВИНА С ИКОНКАМИ -->
-    <div class="dpad-container">
-        <button id="dpad-up" class="dpad-btn">
-            <img src="2.png" alt="Rotate">
-        </button>
-        <button id="dpad-left" class="dpad-btn">
-            <img src="1.png" alt="Left">
-        </button>
-        <button id="dpad-right" class="dpad-btn">
-            <img src="3.png" alt="Right">
-        </button>
-        <button id="dpad-down" class="dpad-btn">
-            <img src="4.png" alt="Down">
-        </button>
-    </div>
-    
-    <!-- ЦЕНТРАЛЬНАЯ ЧАСТЬ -->
-    <div class="center-buttons">
-        <button id="rotate-btn" class="action-btn">
-            <span class="btn-icon">↻</span>
-            <span>ROTATE</span>
-        </button>
-        <button id="hard-drop-btn" class="action-btn">
-            <span class="btn-icon">⬇</span>
-            <span>DROP FAST</span>
-        </button>
-    </div>
-    
-    <!-- ПРАВАЯ ЧАСТЬ -->
-    <div class="right-button">
-        <button id="pause-btn">
-            <span class="pause-icon">⏸</span>
-            <span>PAUSE</span>
-        </button>
-    </div>
+    <button id="left-btn" class="game-btn">
+        <img src="1.png" alt="Left">
+    </button>
+    <button id="rotate-btn" class="game-btn">
+        <img src="2.png" alt="Rotate">
+    </button>
+    <button id="right-btn" class="game-btn">
+        <img src="3.png" alt="Right">
+    </button>
+    <button id="down-btn" class="game-btn">
+        <img src="4.png" alt="Down">
+    </button>
 </div>
 
 <script src="drafts.js"></script>
